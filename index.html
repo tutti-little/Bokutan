@@ -500,10 +500,26 @@ addEventListener('keyup',e=>{if(km[e.code])key[km[e.code]]=0;if(e.code==='ShiftL
 let drag=null;const cvs=R.domElement;
 cvs.addEventListener('pointerdown',e=>{if(drag)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY};try{cvs.setPointerCapture(e.pointerId)}catch(_){}});
 cvs.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
- st.cy-=dx*.006*(window.ADSK||1);if(st.fp&&st.on)st.fpp=Math.max(-1.2,Math.min(1.2,st.fpp-dy*.004*(window.ADSK||1)));else st.cp=Math.min(1.1,Math.max(.08,st.cp+dy*.004))});
+ st.cy-=dx*.006*(window.ADSK||1)*(window.SENS||1);if(st.fp&&st.on)st.fpp=Math.max(-1.2,Math.min(1.2,st.fpp-dy*.004*(window.ADSK||1)*(window.SENS||1)));else st.cp=Math.min(1.1,Math.max(.08,st.cp+dy*.004*(window.SENS||1)))});
 ['pointerup','pointercancel','lostpointercapture'].forEach(n=>cvs.addEventListener(n,e=>{if(drag&&e.pointerId===drag.id)drag=null}));
 R.domElement.addEventListener('wheel',e=>{st.dist=Math.min(10,Math.max(2.5,st.dist+e.deltaY*.004))});
 addEventListener('resize',()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()});
+// ---- 画質 / FPS表示（設定画面から変更。S.qual / S.fps）
+(()=>{const LV={high:()=>Math.min(devicePixelRatio,2),mid:()=>Math.min(devicePixelRatio,1.25),low:()=>.75};
+ let q='high',auto='high',show=false,box=null,n=0,t0=performance.now(),low=0;
+ const apply=l=>{R.setPixelRatio(LV[l]());R.setSize(innerWidth,innerHeight)};
+ window.__applyQuality=v=>{q=(v==='auto'||LV[v])?v:'high';auto='high';apply(q==='auto'?auto:q)};
+ window.__setFps=on=>{show=!!on;
+  if(show&&!box){box=document.createElement('div');box.style.cssText='position:fixed;left:8px;top:calc(env(safe-area-inset-top,0px) + 6px);z-index:9990;pointer-events:none;font:700 12px/1 ui-monospace,Menlo,monospace;color:#9dffb0;background:rgba(0,0,0,.45);padding:3px 6px;border-radius:6px;text-shadow:0 1px 2px #000';document.body.appendChild(box)}
+  if(box)box.style.display=show?'block':'none'};
+ const loop=t=>{requestAnimationFrame(loop);n++;
+  if(t-t0<500)return;
+  if(t-t0>1500){n=0;t0=t;low=0;return}            // 裏に回っていた直後などは測り直す
+  const f=n*1000/(t-t0);n=0;t0=t;
+  if(show&&box)box.textContent=Math.round(f)+' FPS';
+  if(q==='auto'){low=f<30?low+1:0;                 // 30FPS未満が2秒続いたら一段階だけ下げる（上げ戻しはしない）
+   if(low>=4){low=0;const o=['high','mid','low'],i=o.indexOf(auto);if(i<2){auto=o[i+1];apply(auto)}}}};
+ requestAnimationFrame(loop)})();
 function collide(p){const r=.35;for(const b of boxes){if(b.top!==undefined&&p.y>=b.top-.05)continue;
  if(b.rot!==undefined){const c=Math.cos(b.rot),s=Math.sin(b.rot),dx=p.x-b.cx,dz=p.z-b.cz;let lx=dx*c-dz*s,lz=dx*s+dz*c;
   const qx=Math.max(-b.hw,Math.min(lx,b.hw)),qz=Math.max(-b.hd,Math.min(lz,b.hd)),ex=lx-qx,ez=lz-qz,d=Math.hypot(ex,ez);
@@ -957,6 +973,9 @@ const WIMG={"gb": "data:image/webp;base64,UklGRkAKAABXRUJQVlA4IDQKAABwNQCdASqqAH
 const LSK='bokura_v1';let S={keys:50,owned:{ar:1,sn:1,pi:1,fi:1,gr:1},lo:{main:'ar',sub:'pi',c:'fi',d:'gr'},vol:.7,lay:{},acct:null,uid:Math.random().toString(36).slice(2),fr:[],dr:['さくら']};
 try{Object.assign(S,JSON.parse(localStorage.getItem(LSK)||'{}'))}catch(e){}
 if(S.bv==null)S.bv=.5;
+if(S.sens==null)S.sens=1;if(!S.qual)S.qual='high';if(S.fps==null)S.fps=false;
+const applyGfx=()=>{window.SENS=S.sens;try{window.__applyQuality&&window.__applyQuality(S.qual);window.__setFps&&window.__setFps(S.fps)}catch(e){}};
+applyGfx();
 let pt=0;const save=()=>{try{localStorage.setItem(LSK,JSON.stringify(S))}catch(e){}clearTimeout(pt);pt=setTimeout(push,800)};
 // ---- SE
 let AC=null;const SE={tap:[[700,.07,'triangle',0,.3,1000]],ok:[[520,.09,'square',0,.16],[780,.12,'square',.08,.16]],coin:[[1200,.08,'square',0,.14],[1700,.18,'square',.07,.14]],drop:[[260,.35,'sine',0,.6,50]],shake:[[120,.12,'sawtooth',0,.25,90]],flash:[[1800,.5,'sine',0,.3,200]],
@@ -1112,14 +1131,18 @@ async function stage(rk){const g=$('#gst');g.style.display='block';g.innerHTML='
 function showRes(res){const o=$('#gres');o.style.display='block';o.innerHTML=`<div class="box"><div class="oh"><b>結果</b></div><div class="cds${res.length===1?' one':''}">${res.map((x,i)=>{const w=WD[x.id];return`<div class="rc${ORD.indexOf(x.r)>=3?' hi':''}" style="--c:${RAR[x.r].col};animation-delay:${i*.12}s"><i>${ico(x.id)}</i><b>${w.n}</b><span style="color:${RAR[x.r].col}">${'★'.repeat(ORD.indexOf(x.r)+1)} ${RAR[x.r].n}</span><br>${SL[w.s]}武器<br>${x.dup?'ダブり +'+RAR[x.r].rf+'🔑':'<b style="color:#ffe45a">NEW!</b>'}</div>`}).join('')}</div><div style="text-align:center;margin-top:20px"><div class="bt y" id="rok">OK</div></div></div>`;$('#rok').onclick=()=>{o.style.display='none';sfx('ok');rG()}}
 // ---- 設定 / アカウント / フレンド
 let stab='s',ftab='l',pendIcon=null;
+const gfxBind=o=>{
+ $('#sens').oninput=e=>{S.sens=e.target.value/100;window.SENS=S.sens;$('#sensL').textContent='視点感度 '+e.target.value+'%';save()};
+ o.querySelectorAll('[data-q]').forEach(e=>e.onclick=()=>{S.qual=e.dataset.q;save();applyGfx();sfx('tap');rS()});
+ o.querySelectorAll('[data-fp]').forEach(e=>e.onclick=()=>{S.fps=e.dataset.fp==='1';save();applyGfx();sfx('tap');rS()})};
 function openS(t){window.__fr=false;if(t)stab=t;if(stab==='f')stab='s';$('#sov').style.display='block';rS()}
 async function rS(){const o=$('#sov');let body='';
- if(stab==='s')body=`<div class="row2"><label>SE音量 ${Math.round(S.vol*100)}%</label><input type="range" id="vol" min="0" max="100" value="${Math.round(S.vol*100)}"></div><div class="row2"><label>BGM音量 ${Math.round(S.bv*100)}%</label><input type="range" id="bvol" min="0" max="100" value="${Math.round(S.bv*100)}"></div><div class="bt" id="edl">ホーム画面のボタン配置を変更</div><div class="bt" id="edl2" style="margin-top:8px">ゲーム画面のボタン配置を変更</div><div class="note2">ホーム画面のボタンをドラッグして好きな場所に置けます</div>`;
+ if(stab==='s')body=`<div class="row2"><label>SE音量 ${Math.round(S.vol*100)}%</label><input type="range" id="vol" min="0" max="100" value="${Math.round(S.vol*100)}"></div><div class="row2"><label>BGM音量 ${Math.round(S.bv*100)}%</label><input type="range" id="bvol" min="0" max="100" value="${Math.round(S.bv*100)}"></div><div class="row2"><label id="sensL">視点感度 ${Math.round(S.sens*100)}%</label><input type="range" id="sens" min="50" max="200" step="5" value="${Math.round(S.sens*100)}"></div><div class="row2"><label>画質（重い時は下げるとなめらかに）</label><div class="tb" style="margin-bottom:0">${[["high","高"],["mid","中"],["low","低"],["auto","自動"]].map(([k,n])=>`<div data-q="${k}" class="${S.qual===k?'on':''}">${n}</div>`).join('')}</div></div><div class="row2"><label>FPS表示</label><div class="tb" style="margin-bottom:0"><div data-fp="0" class="${S.fps?'':'on'}">オフ</div><div data-fp="1" class="${S.fps?'on':''}">オン</div></div></div><div class="bt" id="edl">ホーム画面のボタン配置を変更</div><div class="bt" id="edl2" style="margin-top:8px">ゲーム画面のボタン配置を変更</div><div class="note2">ホーム画面のボタンをドラッグして好きな場所に置けます</div>`;
  else if(stab==='a'){const a=S.acct||{};body=`<div class="row2"><label>ニックネーム（12文字まで）</label><input type="text" id="nn" maxlength="12" value="${esc(a.nick||'')}"></div><div class="row2"><label>アイコン画像</label><div style="display:flex;gap:10px;align-items:center">${avatar(a)}<input type="file" id="ic" accept="image/*"></div></div><div class="row2"><label>意気込み</label><textarea id="mo" rows="2" maxlength="40">${esc(a.motto||'')}</textarea></div><div class="bt y" id="sa">${S.acct?'保存':'アカウント作成'}</div><div id="ae" class="note2"></div>`}
  else{body=`<div class="tb"><div data-f="l" class="${ftab==='l'?'on':''}">フレンド</div><div data-f="r" class="${ftab==='r'?'on':''}">リクエスト</div><div data-f="s" class="${ftab==='s'?'on':''}">検索</div></div><div id="fb">${S.acct?'読み込み中…':'先にアカウントを作成してください'}</div><div class="note2">${NET.db?'オンライン（共有データ）':'オフラインデモ：実際の他プレイヤーとは繋がっていません'}</div>`}
  o.innerHTML=`<div class="box"><div class="oh"><b>${window.__fr?'フレンド':'設定'}</b><span class="x" data-x>✕</span></div>${window.__fr?'':'<div class="tb"><div data-t="s" class="'+(stab==='s'?'on':'')+'">設定</div><div data-t="a" class="'+(stab==='a'?'on':'')+'">アカウント</div></div>'}${body}</div>`;
  closer(o);o.querySelectorAll('[data-t]').forEach(e=>e.onclick=()=>{stab=e.dataset.t;sfx('tap');rS()});
- if(stab==='s'){$('#vol').oninput=e=>{S.vol=e.target.value/100;save()};$('#vol').onchange=()=>{sfx('ok');rS()};$('#bvol').oninput=e=>{S.bv=e.target.value/100;save()};$('#bvol').onchange=()=>rS();$('#edl').onclick=()=>{o.style.display='none';setEdit(true)};$('#edl2').onclick=()=>{o.style.display='none';startEdit2()}}
+ if(stab==='s'){$('#vol').oninput=e=>{S.vol=e.target.value/100;save()};$('#vol').onchange=()=>{sfx('ok');rS()};$('#bvol').oninput=e=>{S.bv=e.target.value/100;save()};$('#bvol').onchange=()=>rS();gfxBind(o);$('#edl').onclick=()=>{o.style.display='none';setEdit(true)};$('#edl2').onclick=()=>{o.style.display='none';startEdit2()}}
  if(stab==='a'){pendIcon=null;$('#ic').onchange=e=>{const f=e.target.files[0];if(!f)return;const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d'),m=Math.min(im.width,im.height);x.drawImage(im,(im.width-m)/2,(im.height-m)/2,m,m,0,0,96,96);pendIcon=c.toDataURL('image/jpeg',.8);$('#ic').previousElementSibling.innerHTML='<img src="'+pendIcon+'">'};im.src=URL.createObjectURL(f)};
   $('#sa').onclick=async()=>{const nick=$('#nn').value.trim(),er=$('#ae');if(!nick){er.textContent='ニックネームを入力してください';return}
    try{if(NET.db){const d=await NET.db.doc('accounts/'+hex(nick)).get();if(d.exists&&d.data().uid!==S.uid){er.textContent='そのニックネームは使われています';return}}}catch(e){}
@@ -1616,14 +1639,18 @@ async function crateOpen(){if(busy)return;return window.__cNew();sfx('tap');cons
 // ---- 発射ボタンを押したまま指を動かして視点を動かす
 const bfE=document.getElementById('bf');let fpd=null;
 bfE.addEventListener('pointerdown',e=>{fpd={id:e.pointerId,x:e.clientX,y:e.clientY};try{bfE.setPointerCapture(e.pointerId)}catch(_){}});
-bfE.addEventListener('pointermove',e=>{if(!fpd||e.pointerId!==fpd.id)return;const dx=e.clientX-fpd.x,dy=e.clientY-fpd.y;fpd.x=e.clientX;fpd.y=e.clientY;st.cy-=dx*.006*(window.ADSK||1);if(st.fp&&st.on)st.fpp=Math.max(-1.2,Math.min(1.2,st.fpp-dy*.004*(window.ADSK||1)));else st.cp=Math.min(1.1,Math.max(.08,st.cp+dy*.004))});
+bfE.addEventListener('pointermove',e=>{if(!fpd||e.pointerId!==fpd.id)return;const dx=e.clientX-fpd.x,dy=e.clientY-fpd.y;fpd.x=e.clientX;fpd.y=e.clientY;st.cy-=dx*.006*(window.ADSK||1)*(window.SENS||1);if(st.fp&&st.on)st.fpp=Math.max(-1.2,Math.min(1.2,st.fpp-dy*.004*(window.ADSK||1)*(window.SENS||1)));else st.cp=Math.min(1.1,Math.max(.08,st.cp+dy*.004*(window.SENS||1)))});
 ['pointerup','pointercancel','lostpointercapture'].forEach(n=>bfE.addEventListener(n,e=>{if(fpd&&e.pointerId===fpd.id)fpd=null}));
 // ---- ゲーム画面のボタン配置（設定から変更）
 const CTL=[['dpad','#dpad',162,162],['cl','[data-k="cl"]',54,44],['cr','[data-k="cr"]',54,44],['run','#run',70,44],['sum','#sum',130,46],['bj','#bj',82,82],['bs','#bs',70,70],['bf','#bf',86,86],['brl','#brl',56,56],['bsc','#bsc',56,56],['vw','#vw',100,42],['homeb','#home-b',100,42]];
-function placeCtl(c){const el=document.querySelector(c[1]);if(!el)return;const p=S.lay2[c[0]];if(!p){['position','left','top','right','bottom','margin'].forEach(k=>el.style[k]='');return}el.style.position='fixed';el.style.left='calc('+p.x*100+'% - '+c[2]/2+'px)';el.style.top='calc('+p.y*100+'% - '+c[3]/2+'px)';el.style.right='auto';el.style.bottom='auto';el.style.margin='0'}
+// ボタンを動かして position:fixed にすると、元の並び(flex)から抜けて残りのボタンが詰まって動いてしまう。
+// 抜けた場所に同じ大きさの透明な枠を置いて、他のボタンの位置を変えないようにする。
+function holdSpot(c,el){if(el._ph||getComputedStyle(el).position==='absolute')return;const r=el.getBoundingClientRect(),ph=document.createElement('div');ph.style.cssText='flex:none;visibility:hidden;pointer-events:none;width:'+(r.width||c[2])+'px;height:'+(r.height||c[3])+'px';el.parentNode.insertBefore(ph,el);el._ph=ph}
+function syncSpots(){CTL.forEach(c=>{const el=document.querySelector(c[1]);if(!el||!el._ph)return;const r=el.getBoundingClientRect();if(r.width&&r.height){el._ph.style.width=r.width+'px';el._ph.style.height=r.height+'px'}})}
+function placeCtl(c){const el=document.querySelector(c[1]);if(!el)return;const p=S.lay2[c[0]];if(!p){if(el._ph){el._ph.remove();el._ph=null}['position','left','top','right','bottom','margin'].forEach(k=>el.style[k]='');return}holdSpot(c,el);el.style.position='fixed';el.style.left='calc('+p.x*100+'% - '+c[2]/2+'px)';el.style.top='calc('+p.y*100+'% - '+c[3]/2+'px)';el.style.right='auto';el.style.bottom='auto';el.style.margin='0'}
 const applyLay2=()=>CTL.forEach(placeCtl);let ed2=false,dg2=null;
-function startEdit2(){closeAll();home.style.display='none';ed2=true;document.body.classList.add('edit2');$('#ebar2').style.display='block'}
-function endEdit2(){ed2=false;document.body.classList.remove('edit2');$('#ebar2').style.display='none';home.style.display='block';save()}
+function startEdit2(){closeAll();home.style.display='none';ed2=true;document.body.classList.add('edit2');$('#ebar2').style.display='block';syncSpots()}
+function endEdit2(){syncSpots();ed2=false;document.body.classList.remove('edit2');$('#ebar2').style.display='none';home.style.display='block';save()}
 $('#e2ok').onclick=endEdit2;$('#e2rs').onclick=()=>{S.lay2={};applyLay2();save()};
 document.addEventListener('pointerdown',e=>{if(!ed2)return;const c=CTL.find(c=>e.target.closest&&e.target.closest(c[1]));if(!c)return;e.preventDefault();e.stopPropagation();dg2={c,id:e.pointerId}},true);
 document.addEventListener('pointermove',e=>{if(!ed2||!dg2||e.pointerId!==dg2.id)return;S.lay2[dg2.c[0]]={x:Math.min(.96,Math.max(.04,e.clientX/innerWidth)),y:Math.min(.96,Math.max(.04,e.clientY/innerHeight))};placeCtl(dg2.c)},true);
