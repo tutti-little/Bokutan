@@ -1501,8 +1501,8 @@ function tick(now){requestAnimationFrame(tick);const dt=Math.min(.05,(now-last)/
  const ek=eqT>0?.6+.4*(1-eqT/.25):1;gun3.scale.setScalar(ek);vmod.scale.setScalar(ek);
  if(mlT>0){mlT-=dt;if(mlT<=0)mlight.intensity=0}
  if(st.dead){deadT+=dt;body.rotation.z=Math.min(1.45,deadT*3.5);if(deadT>3&&!MT.on)respawn()}
- for(const b of bots){const vis=b.active&&(b.ghost?map==='A':b.kind==='cat'?map==='B':(map==='S'||(MT.on&&(map==='B'||map==='T'))));b.g.visible=vis;if(vis)updBot(b,dt)}
- tickMatch(dt);
+ for(const b of bots){const vis=b.active&&(b.ghost?map==='A':b.kind==='cat'?map==='B':(map==='S'||(MT.on&&(map==='B'||map==='T'))));b.g.visible=vis;if(vis){try{updBot(b,dt)}catch(e){try{console.error(e)}catch(_){}}}}
+ try{tickMatch(dt)}catch(e){try{console.error(e)}catch(_){}}
  for(let i=PJ.length-1;i>=0;i--){const q=PJ[i];q.t+=dt;const rm=()=>{SCN.remove(q.m);PJ.splice(i,1)};
   if(q.k==='g'){q.v.y-=14*dt;const n=q.m.position.clone().addScaledVector(q.v,dt);if(blockedAt(n.x,n.y,n.z)){if(n.y<.1){n.y=.1;q.v.y*=-.35;q.v.x*=.6;q.v.z*=.6}else{q.v.x*=-.4;q.v.z*=-.4;n.copy(q.m.position)}}q.m.position.copy(n);if(q.t>.9){boom(q.m.position,2.6,999,999);rm()}}
   else{q.m.position.addScaledVector(q.v,dt);const p=q.m.position;let hit=blockedAt(p.x,p.y,p.z)||q.t>4;for(const b of bots)if(foe(b)&&Math.hypot(b.x-p.x,b.z-p.z,(b.y||0)+.9-p.y)<1)hit=true;if(hit){boom(p,4,50,50);rm()}}}
@@ -2319,19 +2319,20 @@ const onStart=m=>{
  closeAll();sfx('ok');
  const mine=m.pl.filter(p=>p.team===me.team).length;
  MT.on=true;MT.a=mine;MT.b=m.pl.length-mine;MT.sc=[0,0];MT.round=m.n;MT.state='setup';MY.team='A';kills=0;ON.active=true;
+ try{if(ON.pr==null)ON.pr=R.getPixelRatio();R.setPixelRatio(Math.min(ON.pr,1.25));R.setSize(innerWidth,innerHeight)}catch(e){}
  freeUnits();
  for(const p of m.pl){if(p.id===ON.id)continue;const u=takeUnit();resetUnit(u);u.net=true;u.pid=p.id;u.absTeam=p.team;u.team=p.team===me.team?'A':'B';u.name=p.name;
   setUnitChar(u,(p.ci|0)%CHARS.length);u.tag.material.map=tagTex(p.name,u.team==='A'?'#6fc2ff':'#ff7a7a');u.tag.material.needsUpdate=true;u.active=true;ON.units.set(p.id,u)}
  window.__vm=ON.map.id;window.__sp=ON.map;
  home.style.display='none';applyMap('S');if(!st.on)summon();$('#sb').style.display='block';$('#nping').style.display='block';
  setTimeout(()=>{if(ON.active)onRound(m)},100)};
-const onRound=m=>{MT.round=m.n;MT.state='count';MT.goAt=m.go;MT.cn=0;ON.sentNext=false;
+const onRound=m=>{if(m.n===MT.round&&(MT.state==='count'||MT.state==='play'))return;clearTimeout(ON.nxT);MT.round=m.n;MT.state='count';MT.goAt=m.go;MT.cn=0;ON.sentNext=false;
  const my=slotOf(ON.myTeam,ON.id);
  st.pos.set(my.x,0,my.z);st.face=my.face;st.cy=ON.myTeam===0?0:Math.PI;st.vy=0;st.slide=0;revive();st.lock=true;invT=1;curT.set(st.pos.x,1.2,st.pos.z);FX.position.set(st.pos.x,0,st.pos.z);
  for(const[id,u]of ON.units){const t=ON.pl.find(p=>p.id===id);resetUnit(u);if(t){const s=slotOf(t.team,id);u.x=s.x;u.z=s.z;u.face=s.face}}
  for(const k in WS){AMMO[k].mag=WS[k].max;AMMO[k].res=WS[k].res}fireT=0;rl=0;window.GRN=3;if(window.heldW&&WS[window.heldW]){AK.mag=AK.max;AK.res=WS[window.heldW].res}ammoUI();
  updSB();setMsg('ラウンド '+MT.round+'　5点先取')};
-const onRend=m=>{if(!ON.active)return;MT.state='between';MT.t=3.4;ON.score=m.sc.slice();MT.sc=[ON.score[ON.myTeam],ON.score[1-ON.myTeam]];updSB();st.lock=true;ON.sentNext=false;
+const onRend=m=>{if(!ON.active)return;MT.state='between';MT.t=3.4;ON.score=m.sc.slice();MT.sc=[ON.score[ON.myTeam],ON.score[1-ON.myTeam]];updSB();st.lock=true;ON.sentNext=false;clearTimeout(ON.nxT);ON.nxT=setTimeout(()=>{try{advanceRound()}catch(e){}},3600);
  const win=m.w===ON.myTeam,draw=m.w<0;banner(draw?'DRAW':win?'ROUND WIN!':'ROUND LOSE',draw?'#ffd34d':win?'#7fffb0':'#ff6a6a',2000);sfx(win?'f2':'die');
  if(win)puff(new THREE.Vector3(st.pos.x,1.5,st.pos.z),0xffe070,40,7,1.1,.35,2,.6)};
 const showRes=(title,col,sub,rematch)=>{const o=$('#mres');o.style.display='block';
@@ -2343,7 +2344,7 @@ const onMend=m=>{if(!ON.active)return;MT.state='over';st.lock=true;const win=m.w
  sfx(win?'f3':'die');showRes(win?'勝利！':'敗北…',win?'#ffd34d':'#ff7a7a',m.ab?'相手が退出したため終了':a+' － '+b,!!ON.ws)};
 const onDisc=()=>{if(ON.active){if(ON.lost)return;ON.lost=true;MT.state='over';st.lock=true;banner('接続が切れました','#ff6a6a',1800);showRes('切断','#ff9a6a','通信が切れました',false)}
  else{ON.room=null;if($('#onr').style.display==='block'){closeAll();$('#onp').style.display='block'}err('通信が切れました');stat('')}};
-const endOnline=()=>{ON.active=false;ON.lost=false;freeUnits();$('#nping').style.display='none';for(const q of ON.gp)SCN.remove(q.m);ON.gp.length=0;if(!ON.keepRoom)leaveRoom()};
+const endOnline=()=>{try{if(ON.pr!=null){R.setPixelRatio(ON.pr);R.setSize(innerWidth,innerHeight);ON.pr=null}}catch(e){}ON.active=false;ON.lost=false;freeUnits();$('#nping').style.display='none';for(const q of ON.gp)SCN.remove(q.m);ON.gp.length=0;if(!ON.keepRoom)leaveRoom()};
 const checkTeams=()=>{if(!ON.active||!amHost()||MT.state==='over')return;const c=[0,0];ON.pl.forEach(p=>c[p.team]++);
  if(!c[0]||!c[1])send({t:'mend',w:c[0]?0:1,sc:ON.score,ab:1})};
 const onLeft=m=>{if(!ON.active)return;const p=ON.pl.find(x=>x.id===m.id),u=ON.units.get(m.id);
@@ -2352,7 +2353,7 @@ const onLeft=m=>{if(!ON.active)return;const p=ON.pl.find(x=>x.id===m.id),u=ON.un
  if(p)setMsg(p.name+'が退出しました');checkTeams()};
 
 // ---------- 位置の送受信（60Hz。画面更新が60fps未満の端末ではその回数まで） ----------
-const netSend=dt=>{ON.sendT-=dt;if(ON.sendT>0)return;ON.sendT=Math.max(ON.sendT+1/60,-.05);
+const netSend=dt=>{ON.sendT-=dt;if(ON.sendT>0)return;ON.sendT=Math.max(ON.sendT+1/30,-.05);
  if(MT.state==='setup'||ON.lost)return;
  const a=[r2(st.pos.x),r2(st.pos.y),r2(st.pos.z),r2(st.face),HP.cur|0,window.heldW||'',st.dead?1:0,MT.round],L=ON.last,t=performance.now();
  if(L&&t-ON.hb<250&&a.every((v,i)=>v===L[i]))return;       // 止まっている間は4Hzの生存通知だけ（動いている間は毎回送る）
@@ -2401,17 +2402,18 @@ const tickGP=dt=>{for(let i=ON.gp.length-1;i>=0;i--){const q=ON.gp[i];q.t+=dt;
 
 // ---------- ラウンド進行 ----------
 const onlineTick=dt=>{netSend(dt);tickGP(dt);
- ON.delay+=(Math.min(.3,Math.max(.08,ON.lag+ON.dev*2.5+.025))-ON.delay)*Math.min(1,dt*.8);   // 回線に合わせて表示遅延をゆっくり調整
+ ON.delay+=(Math.min(.3,Math.max(.1,ON.lag+ON.dev*2.5+.025))-ON.delay)*Math.min(1,dt*.8);   // 回線に合わせて表示遅延をゆっくり調整
  if(ON.lost)return;
  if(MT.state==='count'){const left=(MT.goAt-sNow())/1000,n=Math.ceil(left);
   if(n!==MT.cn&&n>=1&&n<=3){MT.cn=n;banner(String(n),'#ffd34d',900);sfx('tap')}
   if(left<=0){MT.state='play';if(!st.dead)st.lock=false;banner('FIGHT!','#ff5a4a',1100);sfx('f1');shake(.05)}}
- else if(MT.state==='play'){updSB();
+ else if(MT.state==='play'){if((ON.sbT=(ON.sbT||0)-dt)<=0){ON.sbT=.25;updSB()}
   if(amHost()){const aA=aliveCt('A'),aB=aliveCt('B');
    if(!aA||!aB){MT.state='ending';const w=aA?ON.myTeam:aB?1-ON.myTeam:-1,sc=ON.score.slice();if(w>=0)sc[w]++;send({t:'rend',w,sc})}}}
  else if(MT.state==='between'){MT.t-=dt;
-  if(MT.t<=0&&amHost()&&!ON.sentNext){ON.sentNext=true;
-   if(Math.max(ON.score[0],ON.score[1])>=5)send({t:'mend',w:ON.score[0]>=5?0:1,sc:ON.score});else send({t:'round',n:MT.round+1})}}};
+  if(MT.t<=0&&amHost()){if(!ON.sentNext)advanceRound();else if(performance.now()-(ON.sentAt||0)>2500)ON.sentNext=false}}};   // 送ったのに2.5秒たっても進まなければ再送
+const advanceRound=()=>{if(!ON.active||!amHost()||MT.state!=='between'||ON.sentNext)return;ON.sentNext=true;ON.sentAt=performance.now();
+ if(Math.max(ON.score[0],ON.score[1])>=5)send({t:'mend',w:ON.score[0]>=5?0:1,sc:ON.score});else send({t:'round',n:MT.round+1})};
 
 // ---------- 既存の処理へのフック（CPU対戦のコードは触らず、オンライン時だけ分岐） ----------
 const _sh=showHome;showHome=function(){if(ON.active)return;_sh()};window.showHome=showHome;   // 試合中は、遅れて来たホーム表示を無視（onHome→leaveMatch→切断 の連鎖を防ぐ）
