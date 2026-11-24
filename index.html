@@ -2048,6 +2048,9 @@ const mkRelayConn=(s,pid)=>{const h={};const c={peer:pid,open:true,relay:true,pe
  on(e,f){(h[e]=h[e]||[]).push(f);return c},send(o){busPub(s,pid,o)},close(){if(c.open){c.open=false;(h.close||[]).forEach(f=>f())}}};return c};
 const busIn=(s,m)=>{if(s.dead)return;let o;try{o=JSON.parse(typeof m==='string'?m:new TextDecoder().decode(m))}catch(e){return}
  if(!o||!o.f||o.d==null)return;const pid=String(o.f);let L=s.links.get(pid);
+ // 直結を試した時点でこちらには「接続が来た」扱いのリンクだけが残り、ICEが通らず開かないまま居座ることがある。
+ // それが残っていると中継から届いた入室要求がそこに流れて、返事(welcome)が送れず相手がずっと入れない → 開いていない直結リンクは中継リンクに置き換える
+ if(L&&!L.conn.relay&&!(L.open&&L.conn.open)){if(!s.R)return;L=null}
  if(!L){if(!s.R)return;L=addLink(s,mkRelayConn(s,pid))}                  // 部屋の主だけが、見知らぬ相手(直結できなかった人)を受け入れる
  onData(s,L,o.d,false)};
 
@@ -2138,7 +2141,8 @@ const onData=(s,L,d,viaFast)=>{if(s.dead)return;
 // ---------- ホストの仕事（元の中継サーバーがやっていたこと） ----------
 const hostJoin=(s,L,d)=>{
  if(!isHost(s)){sendL(L,{t:'err',c:'nohost',m:'ルームが見つかりません'});return}
- const R=s.R;if(R.pl.some(p=>p.pid===L.pid))return;
+ const R=s.R;const ex=R.pl.find(p=>p.pid===L.pid);
+ if(ex){L.id=ex.id;sendL(L,{t:'welcome',id:ex.id,T:sNow(),room:snap(s)});return}        // 再送された入室要求：無言で捨てると相手が待ち続けて固まる
  if(R.st){sendL(L,{t:'err',c:'busy',m:'試合がはじまっています'});return}
  if(R.pl.length>=R.n*2){sendL(L,{t:'err',c:'full',m:'ルームがいっぱいです'});return}
  const c=[0,0];R.pl.forEach(p=>c[p.team]++);let tm=c[0]<=c[1]?0:1;if(c[tm]>=R.n)tm=1-tm;
@@ -2191,10 +2195,11 @@ const hostAt=async(s,pid,o)=>{                                  // true=成功 /
  startLoops(s);pushRoom(s);busUp(s).catch(()=>{});return true};     // 中継の待ち受けも裏で準備（直結できない人用）
 const tryJoin=async(s,pid)=>{                                    // 'ok' | 'absent'(そのIDの部屋は無い) | 'full' | 'fail'
  let c,wait=7000;
- try{c=await connectTo(s,pid,7000)}catch(e){
+ const pre=setTimeout(()=>{if(!s.dead&&s.peer)busUp(s).catch(()=>{})},1500);   // 直結に1.5秒以上かかっているなら、中継の準備も裏で始めておく（だめでも待たされない）
+ try{c=await connectTo(s,pid,7000);clearTimeout(pre)}catch(e){clearTimeout(pre);
   if(e==='absent')return'absent';
-  try{stat('直結できないため、中継経由で接続しています…');await busUp(s)}catch(_){return'fail'}      // 直結できない回線：中継バスで入る
-  if(s.dead)return'dead';c=mkRelayConn(s,pid);wait=5000}
+  try{stat('直結できないため、中継経由で接続しています…');await Promise.race([busUp(s),new Promise((_,no)=>setTimeout(()=>no('timeout'),15000))])}catch(_){return'fail'}      // 直結できない回線：中継バスで入る（15秒でだめなら諦めてエラー表示）
+  if(s.dead)return'dead';c=mkRelayConn(s,pid);wait=8000}
  if(s.dead){try{c.close()}catch(e){}return'dead'}
  const L=addLink(s,c);
  const r=await new Promise(res=>{const to=setTimeout(()=>{s.joinW=null;res({t:'err',c:'timeout'})},wait);
@@ -2305,7 +2310,11 @@ const freeUnits=()=>{for(const u of ON.units.values()){u.net=false;u.active=fals
 const slotOf=(team,id)=>{const mem=ON.pl.filter(p=>p.team===team).sort((a,b)=>a.id-b.id),n=mem.length,idx=Math.max(0,mem.findIndex(p=>p.id===id));
  const o=[...Array(n).keys()].sort((p,q)=>Math.abs(p-(n-1)/2)-Math.abs(q-(n-1)/2)),k=o[idx],B=team===0?ON.map.a:ON.map.b;
  return{x:(k-(n-1)/2)*5*ON.map.k+B[0],z:B[1],face:team===0?Math.PI:0}};
-const onStart=m=>{if(ON.active)return;const me=m.pl.find(p=>p.id===ON.id);if(!me)return;
+const onStart=m=>{
+ if(ON.active){   // 前の試合の結果画面のまま次の「開始」が届いた（ホストが先に「もう一度」→開始した時）。無視すると入れないまま固まるので、結果画面を閉じて新しい試合へ入る
+  if(MT.state!=='over'||ON.lost||!m.pl.some(p=>p.id===ON.id))return;
+  $('#mres').style.display='none';ON.keepRoom=true;try{leaveMatch()}finally{ON.keepRoom=false}}
+ const me=m.pl.find(p=>p.id===ON.id);if(!me)return;
  ON.pl=m.pl.slice();ON.myTeam=me.team;ON.score=[0,0];ON.map=MPS[m.map]||MPS.S;ON.lost=false;ON.sentNext=false;ON.last=null;
  closeAll();sfx('ok');
  const mine=m.pl.filter(p=>p.team===me.team).length;
@@ -2314,7 +2323,7 @@ const onStart=m=>{if(ON.active)return;const me=m.pl.find(p=>p.id===ON.id);if(!me
  for(const p of m.pl){if(p.id===ON.id)continue;const u=takeUnit();resetUnit(u);u.net=true;u.pid=p.id;u.absTeam=p.team;u.team=p.team===me.team?'A':'B';u.name=p.name;
   setUnitChar(u,(p.ci|0)%CHARS.length);u.tag.material.map=tagTex(p.name,u.team==='A'?'#6fc2ff':'#ff7a7a');u.tag.material.needsUpdate=true;u.active=true;ON.units.set(p.id,u)}
  window.__vm=ON.map.id;window.__sp=ON.map;
- home.style.display='none';applyMap('S');summon();$('#sb').style.display='block';$('#nping').style.display='block';
+ home.style.display='none';applyMap('S');if(!st.on)summon();$('#sb').style.display='block';$('#nping').style.display='block';
  setTimeout(()=>{if(ON.active)onRound(m)},100)};
 const onRound=m=>{MT.round=m.n;MT.state='count';MT.goAt=m.go;MT.cn=0;ON.sentNext=false;
  const my=slotOf(ON.myTeam,ON.id);
@@ -2405,6 +2414,7 @@ const onlineTick=dt=>{netSend(dt);tickGP(dt);
    if(Math.max(ON.score[0],ON.score[1])>=5)send({t:'mend',w:ON.score[0]>=5?0:1,sc:ON.score});else send({t:'round',n:MT.round+1})}}};
 
 // ---------- 既存の処理へのフック（CPU対戦のコードは触らず、オンライン時だけ分岐） ----------
+const _sh=showHome;showHome=function(){if(ON.active)return;_sh()};window.showHome=showHome;   // 試合中は、遅れて来たホーム表示を無視（onHome→leaveMatch→切断 の連鎖を防ぐ）
 const _tm=tickMatch;tickMatch=function(dt){if(ON.active)onlineTick(dt);else _tm(dt)};
 const _ub=updBot;updBot=function(b,dt){if(b.net)updNet(b,dt);else _ub(b,dt)};
 const _lm=leaveMatch;leaveMatch=function(){if(ON.active)endOnline();_lm()};
