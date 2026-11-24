@@ -511,7 +511,7 @@
         #tutDots { font-size: 13px; color: #667; }
         #tutHint { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 9000; display: none; width: min(540px, calc(100vw - 150px)); box-sizing: border-box; padding: 9px 14px; font-size: 14px; line-height: 1.5; font-weight: 700; color: #fff; background: rgba(214,40,40,0.92); border-radius: 12px; pointer-events: none; text-align: center; font-family: sans-serif; }
 
-        /* ===== 利用時間の制限（午前8時〜午後4時は使えない） ===== */
+        /* ===== 利用時間の制限（午前7時〜午後4時は使えない） ===== */
         #lockScreen { position: fixed; inset: 0; overflow: hidden; z-index: 20000; display: none; flex-direction: column; align-items: center; justify-content: center; background: #0b1226; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; box-sizing: border-box; }
         #lockScreen.show { display: flex; }
         #lockScreen .lk-title { font-size: 26px; font-weight: 800; margin-bottom: 10px; }
@@ -701,7 +701,7 @@
     <div id="tutSlides"><div id="tutCard"><div id="tutBody"></div><div id="tutNav"><button id="tutPrev" type="button">◀ 前へ</button><span id="tutDots"></span><button id="tutNext" type="button">次へ ▶</button></div></div></div>
     <div id="lockScreen">
         <div class="lk-title">🔒 ただいま利用できません</div>
-        <div class="lk-sub">平日の午前8時〜午後4時は、このゲームは使えません。<br>午後4時を過ぎるか、土日・祝日になったらまた遊べます。</div>
+        <div class="lk-sub">平日の午前7時〜午後4時は、このゲームは使えません。<br>午後4時を過ぎるか、土日・祝日になったらまた遊べます。</div>
         <div id="lockTaunt"><img id="lockFace" alt=""><div class="lk-bubble" id="lockBubble"></div></div>
         <button id="lockAttack" type="button">野球ボールを投げて攻撃する</button>
         <div id="lockAdmin"><label for="lockPass">管理者パスワード</label><input id="lockPass" type="password" autocomplete="off"><button id="lockPassBtn" type="button">OK</button><span id="lockMsg"></span></div>
@@ -6720,8 +6720,8 @@ const THIRD_BASE_REACTION_FRAMES = 18;  // サード（fielders[4]）が動き�
             return _addOut.apply(this, arguments);
         };
 
-        // ===== 利用時間の制限：午前8時〜午後4時（16時になるまで）は使えない。管理者パスワードで解除できる =====
-        const LOCK_START_HOUR = 8, LOCK_END_HOUR = 16;
+        // ===== 利用時間の制限：午前7時〜午後4時（16時になるまで）は使えない。管理者パスワードで解除できる =====
+        const LOCK_START_HOUR = 7, LOCK_END_HOUR = 16;
         const LOCK_ADMIN_PASSWORD = '5funkansou';
         // 確認用：アドレスの末尾に #lock-preview を付けて開くと、時間や曜日に関係なくロック画面が出る（自分で見た目を確認できる）
         const LOCK_PREVIEW = /lock-preview/.test(location.hash);
@@ -6828,7 +6828,11 @@ const THIRD_BASE_REACTION_FRAMES = 18;  // サード（fielders[4]）が動き�
         }
         // サイトを強制的に閉じる。スクリプトで開いたタブ以外は window.close() が効かないブラウザが多いので、効かなければ空白のページへ移動する
         function lockForceClose() {
-            document.body.innerHTML = '';
+            // ゲームの描画ループを止めて（DOM を消すとループがエラーを出し続けるため、消さずに黒い幕で覆う）から閉じる
+            window.requestAnimationFrame = function () { return 0; };
+            const cover = document.createElement('div');
+            cover.style.cssText = 'position:fixed;inset:0;background:#000;z-index:2147483647;';
+            document.body.appendChild(cover);
             try { window.close(); } catch (e) {}
             setTimeout(() => { try { location.replace('about:blank'); } catch (e) {} }, 200);
         }
@@ -6866,7 +6870,28 @@ const THIRD_BASE_REACTION_FRAMES = 18;  // サード（fielders[4]）が動き�
         document.getElementById('lockPassBtn').addEventListener('click', lockTryPassword);
         document.getElementById('lockPass').addEventListener('keydown', e => { if (e.key === 'Enter') lockTryPassword(); });
         lockRefresh();
-        setInterval(lockRefresh, 15000);   // 遊んでいる途中で8時になったときも止める
+        setInterval(lockRefresh, 15000);   // 遊んでいる途中で7時になったときも止める
+
+        // ===== 離れたら閉じる：別のタブ・別のアプリを開く／スリープにする → 1秒でこのタブを閉じる =====
+        const LEAVE_CLOSE_ENABLED = true;   // false にすると、この機能を止める
+        const LEAVE_CLOSE_MS = 1000;        // 離れてから閉じるまでの時間（ミリ秒）
+        let leaveSince = 0, leaveTimer = null;
+        // スマホ・タブレット（タッチ操作）では「ページが見えなくなったか」だけで判断する。
+        // document.hasFocus() はスマホのブラウザで、タップしただけでも false になることがあり、誤って閉じてしまうため使わない。
+        const LEAVE_IS_TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+        const isAway = () => document.hidden || (!LEAVE_IS_TOUCH && !document.hasFocus());   // パソコンだけは、別のアプリに切り替えて操作の対象から外れた場合も「離れた」とみなす
+        function leaveCancel() { if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; } leaveSince = 0; }
+        function leaveClose() { leaveCancel(); lockForceClose(); }
+        function leaveCheck() {
+            if (!LEAVE_CLOSE_ENABLED || LOCK_PREVIEW) return;   // #lock-preview で確認しているときは閉じない
+            if (isAway()) {
+                if (!leaveSince) leaveSince = Date.now();
+                if (Date.now() - leaveSince >= LEAVE_CLOSE_MS) { leaveClose(); return; }   // スリープなどでタイマーが止まっていて、戻ってきたときは、すぐ閉じる
+                if (!leaveTimer) leaveTimer = setTimeout(() => { leaveTimer = null; if (isAway()) leaveClose(); else leaveCancel(); }, LEAVE_CLOSE_MS);
+            } else if (leaveSince && Date.now() - leaveSince >= LEAVE_CLOSE_MS) leaveClose();   // 1秒以上離れていた（スリープ中でタイマーが動かなかった）なら、戻った瞬間に閉じる
+            else leaveCancel();   // 1秒以内に戻ってきたら、閉じない
+        }
+        (LEAVE_IS_TOUCH ? ['visibilitychange', 'pagehide', 'pageshow', 'freeze', 'resume'] : ['visibilitychange', 'blur', 'focus', 'pagehide', 'pageshow', 'freeze', 'resume']).forEach(t => (t === 'visibilitychange' ? document : window).addEventListener(t, () => setTimeout(leaveCheck, 0)));
         animate();
     </script>
 </body>
