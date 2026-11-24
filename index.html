@@ -2403,7 +2403,14 @@ const samp=u=>{const b=u.buf,n=b.length;if(!n)return;const rt=sNow()-ON.delay*10
 const updNet=(u,dt)=>{if(u.dead){u.dead+=dt;place(u);return}u.hit=Math.max(0,u.hit-dt);samp(u);u.vx=-Math.sin(u.face);u.vz=Math.cos(u.face);place(u)};
 
 // ---------- 戦闘（撃った側が判定→当たった側に反映） ----------
-const onHit=m=>{if(!ON.active||MT.state!=='play'||st.dead)return;hurt(m.dm,ON.units.get(m.f)||undefined)};
+const dbgD=()=>ON.dbg||(ON.dbg={s:0,r:0,x:0,hs:0,why:''});
+const onHit=m=>{const D=dbgD();
+ if(!ON.active){D.x++;D.why='inactive';return}
+ if(st.dead){D.x++;D.why='dead';return}
+ const left=(MT.goAt-sNow())/1000;                     // 開始の時計ズレで、相手が先に『開始』になった直後の弾も受ける
+ if(MT.state!=='play'&&!(MT.state==='count'&&left<1.2)){D.x++;D.why='st:'+MT.state;return}
+ if(invT>0){D.x++;D.why='inv';return}
+ D.r++;hurt(m.dm,ON.units.get(m.f)||undefined)};
 const colOf=u=>u.team==='B'?'#ff8a8a':'#7fc4ff';
 const fxBoom=(p,r)=>{const d=Math.hypot(st.pos.x-p.x,st.pos.z-p.z);sfx('boom',Math.max(.1,1-d/60));
  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:ct,color:0xff9030,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false}));s.position.copy(p);SCN.add(s);fxs.push({s,t:0,r});
@@ -2444,6 +2451,12 @@ const advanceRound=go=>{if(!ON.active||!amHost()||MT.state!=='between'||ON.sentN
 // 各端末が自分のタイマーで同じ時刻に次ラウンドへ入る（ホストからの通知待ち・描画の遅さに左右されない）
 const startNext=go=>{if(!ON.active||ON.lost||MT.state!=='between'||Math.max(ON.score[0],ON.score[1])>=5)return;onRound({n:MT.round+1,go:go})};
 
+// ---------- 診断表示（ダメージが届いているか確認用） ----------
+setInterval(()=>{try{let e=document.getElementById('ndbg');
+ if(!ON.active){if(e)e.style.display='none';return}
+ if(!e){e=document.createElement('div');e.id='ndbg';e.style.cssText='position:fixed;left:6px;bottom:6px;z-index:99999;font:11px/1.3 monospace;color:#9f9;background:rgba(0,0,0,.45);padding:2px 5px;border-radius:4px;pointer-events:none;white-space:nowrap';document.body.appendChild(e)}
+ const D=dbgD();e.style.display='block';e.textContent=(amHost()?'HOST ':'GUEST ')+MT.state+' R'+MT.round+' | 送'+D.s+' 受'+D.r+' 無視'+D.x+(D.why?'('+D.why+')':'')+' 送れず'+D.hs}catch(_){}},1000);
+
 // ---------- ホストの自動復帰（止まったら自力で進める。描画ループとは別のタイマー） ----------
 (()=>{let key='',t0=performance.now();
  setInterval(()=>{try{
@@ -2469,8 +2482,11 @@ const _lm=leaveMatch;leaveMatch=function(){if(ON.active)endOnline();_lm()};
 const _bw=window.__bw;window.__bw=b=>{if(_bw)_bw(b);if(b.net||b.y){try{b.g.position.y=b.y||0;if(b.wm)b.wm.position.y+=b.y||0}catch(e){}}};
 const _hb=hurtBot;hurtBot=function(b,dm,head,by){
  if(!b.net)return _hb(b,dm,head,by);
- if(by!==undefined||b.dead||!ON.active||MT.state!=='play')return;
+ if(by!==undefined||b.dead||!ON.active)return;
+ {const D=dbgD();if(MT.state!=='play'){D.hs++;return}D.s++}
  send({t:'hit',to:b.pid,dm:Math.round(dm),hd:head?1:0});
+ if(dm>=900){const rn=MT.round,pid=b.pid;                                  // 一撃必殺(バット等)は、届かなかった時のために再送（相手が既に倒れていれば無害）
+  for(const dl of [250,700])setTimeout(()=>{if(ON.active&&MT.state==='play'&&MT.round===rn&&!b.dead&&b.net&&b.pid===pid)send({t:'hit',to:pid,dm:999,hd:0})},dl)}
  b.hp=Math.max(1,b.hp-dm);b.hit=.15;b.hitT=performance.now();                 // 手応えは即表示（本当のHPは相手から届く）
  const hp=new THREE.Vector3(b.x,(b.y||0)+(head?1.6:1.1),b.z);marker(head);sfx('hit');puff(hp,head?0xffd34d:0xff5a40,head?12:7,3,.35,.2,6);
  popup(dm>=900?'HEADSHOT!':(head?'HEAD ':'')+Math.round(Math.min(dm,100)),hp,head?'#ffd34d':'#fff',head?28:20);if(head)shake(.02)};
