@@ -346,7 +346,304 @@ linear-gradient(var(--c,#7fd4ff),var(--c,#7fd4ff)) 100% 100%/11px 2px no-repeat,
   try{var m=document.querySelector('meta[name=viewport]');if(m)m.setAttribute('content','width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover')}catch(_){}
 })();
 </script>
-</head>
+<script>
+    (function() {
+        var buffer = window.__base44_preview_native_failures;
+        if (!buffer || buffer.version !== 1 || !Array.isArray(buffer.entries)) {
+            buffer = { version: 1, entries: [], listenersInstalled: false };
+            window.__base44_preview_native_failures = buffer;
+        }
+        if (buffer.listenersInstalled) return;
+        function value(object, key) {
+            return object && typeof object[key] === 'string' ? object[key] : '';
+        }
+        function append(message) {
+            if (!message) return;
+            var normalizedMessage = String(message).slice(0, 5000);
+            for (var index = buffer.entries.length - 1; index >= 0; index--) {
+                var existing = buffer.entries[index];
+                if (existing && existing.level === 'error' && existing.message === normalizedMessage) {
+                    buffer.entries.splice(index, 1);
+                }
+            }
+            buffer.entries.push({
+                level: 'error',
+                message: normalizedMessage,
+                timestamp: Date.now()
+            });
+            if (buffer.entries.length > 100) {
+                buffer.entries.splice(0, buffer.entries.length - 100);
+            }
+        }
+        buffer.append = append;
+        function handleError(event) {
+            var target = event && event.target;
+            var tagName = value(target, 'tagName').toLowerCase() || 'window';
+            var isModule = tagName === 'script' && value(target, 'type').toLowerCase() === 'module';
+            var resourceType = isModule ? 'module' : tagName;
+            var url = value(target, 'src') || value(target, 'href') || value(event, 'filename');
+            var detail = value(event, 'message') || value(event && event.error, 'message');
+            var prefix = tagName === 'window' ? 'Native browser error' : 'Failed to load ' + resourceType;
+            append(prefix + (url ? ' ' + url : '') + (detail ? ': ' + detail : ''));
+        }
+        function rejectionReason(reason) {
+            if (typeof reason === 'string') return reason;
+            var message = value(reason, 'message');
+            if (message) return message;
+            try { return JSON.stringify(reason) || String(reason); }
+            catch (e) { return String(reason); }
+        }
+        function handleRejection(event) {
+            append('Unhandled promise rejection: ' + rejectionReason(event && event.reason));
+        }
+        function handleCspViolation(event) {
+            var blockedUri = value(event, 'blockedURI') || 'resource';
+            var directive = value(event, 'violatedDirective');
+            append('Content Security Policy blocked ' + blockedUri + (directive ? ' (' + directive + ')' : ''));
+        }
+        function overlayText(root, selector) {
+            var element = root && root.querySelector(selector);
+            return value(element, 'textContent').trim();
+        }
+        function captureViteOverlay(overlay) {
+            var root = overlay && overlay.shadowRoot;
+            var message = overlayText(root, '.message-body');
+            if (!message) return;
+            var plugin = overlayText(root, '.plugin');
+            var details = ['Vite build error: ' + (plugin ? plugin + ' ' : '') + message];
+            var file = overlayText(root, '.file');
+            var frame = overlayText(root, '.frame');
+            var stack = overlayText(root, '.stack');
+            if (file) details.push('File: ' + file);
+            if (frame) details.push(frame);
+            if (stack) details.push(stack);
+            append(details.join(String.fromCharCode(10)));
+        }
+        function captureViteOverlays(node) {
+            if (!node || node.nodeType !== 1) return;
+            if (node.matches && node.matches('vite-error-overlay')) captureViteOverlay(node);
+            if (!node.querySelectorAll) return;
+            var overlays = node.querySelectorAll('vite-error-overlay');
+            for (var index = 0; index < overlays.length; index++) captureViteOverlay(overlays[index]);
+        }
+        window.addEventListener('error', handleError, true);
+        window.addEventListener('unhandledrejection', handleRejection);
+        window.addEventListener('securitypolicyviolation', handleCspViolation);
+        if (typeof MutationObserver !== 'undefined' && document.documentElement) {
+            captureViteOverlays(document.documentElement);
+            new MutationObserver(function(records) {
+                for (var recordIndex = 0; recordIndex < records.length; recordIndex++) {
+                    var nodes = records[recordIndex].addedNodes;
+                    for (var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex++) {
+                        captureViteOverlays(nodes[nodeIndex]);
+                    }
+                }
+            }).observe(document.documentElement, { childList: true, subtree: true });
+        }
+        buffer.listenersInstalled = true;
+    })();
+    </script><script data-preview-data-env-pin="true">
+    (function() {
+        var KEY = 'base44_data_env';
+        var APP_API_PATH = "/api/apps/6b04e56405217cfa40eb0cc6/";
+        var STORAGE_KEY = KEY + ':' + APP_API_PATH;
+        var API_ORIGINS = ["https://app.base44.com", "https://base44.app"].map(function(u) { return new URL(u).origin; });
+        var REQUEST_INIT_KEYS = [
+            'method', 'headers', 'credentials', 'mode', 'cache', 'redirect',
+            'referrer', 'referrerPolicy', 'integrity', 'keepalive', 'signal', 'priority',
+        ];
+        var env = new URLSearchParams(window.location.search).get(KEY);
+        try {
+            if (env === 'dev' || env === 'prod') sessionStorage.setItem(STORAGE_KEY, env);
+            else env = sessionStorage.getItem(STORAGE_KEY);
+        } catch (e) {}
+        if (env !== 'dev' && env !== 'prod') return;
+        function pin(url) {
+            try {
+                var u = new URL(url, window.location.href);
+                var sameOrigin = u.origin === window.location.origin;
+                if (!sameOrigin && API_ORIGINS.indexOf(u.origin) === -1) return url;
+                // The app's own server routes and TanStack server functions build
+                // their SDK client from this request, so they need the selection too.
+                var appServerPath = sameOrigin && (
+                    u.pathname.startsWith('/api/') || u.pathname.startsWith('/_serverFn/')
+                );
+                if (!appServerPath && !u.pathname.startsWith(APP_API_PATH)) return url;
+                // Privileged function/agent routes trust this app's Preview host,
+                // not a dev parameter sent to the generic SDK API origin.
+                if (u.origin !== window.location.origin && (
+                    u.pathname.startsWith(APP_API_PATH + 'functions/') ||
+                    u.pathname.startsWith(APP_API_PATH + 'agents/')
+                )) {
+                    u = new URL(u.pathname + u.search + u.hash, window.location.origin);
+                }
+                u.searchParams.set(KEY, env);
+                return u.toString();
+            } catch (e) { return url; }
+        }
+        var origFetch = window.fetch;
+        window.fetch = function(input, init) {
+            if (typeof input === 'string' || input instanceof URL) {
+                return origFetch.call(this, pin(String(input)), init);
+            }
+            if (!input || !input.url) return origFetch.call(this, input, init);
+            var pinned = pin(input.url);
+            if (pinned === input.url) return origFetch.call(this, input, init);
+            try {
+                input = new Request(input, init);
+                if (!input.keepalive || !input.body) {
+                    return origFetch.call(this, new Request(pinned, input));
+                }
+                // RequestInit exposes an existing body as a stream, which Fetch
+                // forbids with keepalive. Buffer only that case, after init overrides.
+                var self = this;
+                return input.blob().then(function(body) {
+                    var rebuilt = { body: body };
+                    REQUEST_INIT_KEYS.forEach(function(key) {
+                        if (input[key] !== undefined) rebuilt[key] = input[key];
+                    });
+                    return origFetch.call(self, new Request(pinned, rebuilt));
+                });
+            } catch (error) { return Promise.reject(error); }
+        };
+        var origOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url) {
+            arguments[1] = pin(String(url));
+            return origOpen.apply(this, arguments);
+        };
+    })();
+    </script><script defer data-preview-inject="true" data-parent-origins="https://app.base44.com https://superagent.base44.com" data-app-id="6b04e56405217cfa40eb0cc6" data-preview-type="latest_preview" data-rum-app-id="db50c921-10c3-4f12-bccb-950fa174b708" data-rum-client-token="pubfe8a4f2972b412b4556fd67e77f82cb4" data-dd-site="datadoghq.com" src="https://app.base44.com/builder-bridge.js?t=1795485213"></script><script>
+    (function() {
+        var IGNORE = { SCRIPT: 1, STYLE: 1, LINK: 1, META: 1, NOSCRIPT: 1, TEMPLATE: 1 };
+        const fire = () => window.parent.postMessage({ type: 'IFRAME_CONTENT_READY' }, '*');
+        function check() {
+            var body = document.body;
+            if (!body) return false;
+            for (var idx = 0; idx < body.children.length; idx++) {
+                if (!IGNORE[body.children[idx].tagName]) return true;
+            }
+            return false;
+        }
+        function start() {
+            if (check()) { fire(); return; }
+            var observer = new MutationObserver(function() {
+                if (check()) { fire(); observer.disconnect(); }
+            });
+            observer.observe(document.documentElement, { childList: true, subtree: true });
+        }
+        if (document.body) { start(); }
+        else { document.addEventListener('DOMContentLoaded', start, { once: true }); }
+    })();
+    </script><script>
+    (function() {
+        if (window.self === window.top) return;
+        var APP_ID = "6b04e56405217cfa40eb0cc6";
+        var PREVIEW_TYPE = "latest_preview";
+        var on404 = false;
+        var booted = false;
+        function detect() { return !!document.querySelector('[data-source-location^="PageNotFound:"]'); }
+        function payload() { return { app_id: APP_ID, preview_type: PREVIEW_TYPE, url_path: window.location.pathname }; }
+        function tick() {
+            var now = detect();
+            if (now && !on404) {
+                on404 = true;
+                window.parent.postMessage({ type: 'PREVIEW_PAGE_NOT_FOUND', payload: payload() }, '*');
+            } else if (!now && (on404 || !booted)) {
+                // On first tick of a fresh document, emit a cleared signal even when
+                // not currently on a 404 — the parent may have latched is404=true from
+                // a previous document at the same URL (e.g. after an iframe reload).
+                on404 = false;
+                window.parent.postMessage({ type: 'PREVIEW_PAGE_NOT_FOUND_CLEARED', payload: payload() }, '*');
+            }
+            booted = true;
+        }
+        function start() {
+            tick();
+            new MutationObserver(tick).observe(document.body, { childList: true, subtree: true });
+        }
+        if (document.body) { start(); }
+        else { document.addEventListener('DOMContentLoaded', start, { once: true }); }
+    })();
+    </script><script>
+    (function() {
+        if (window.self === window.top) return;
+        var HEADINGS = ["Your app will appear here", "Your app starts here"];
+        var shown = false;
+        var booted = false;
+        var documentId = Math.random().toString(36).slice(2);
+        function detect() {
+            var hs = document.getElementsByTagName('h1');
+            for (var i = 0; i < hs.length; i++) {
+                if (HEADINGS.indexOf((hs[i].textContent || '').trim()) !== -1) return true;
+            }
+            return false;
+        }
+        function payload() { return { app_id: "6b04e56405217cfa40eb0cc6", preview_type: "latest_preview", url_path: window.location.pathname, document_id: documentId }; }
+        function tick() {
+            var now = detect();
+            if (now && !shown) {
+                shown = true;
+                window.parent.postMessage({ type: 'PREVIEW_TEMPLATE_HOME_SHOWN', payload: payload() }, '*');
+            } else if (!now && (shown || !booted)) {
+                shown = false;
+                window.parent.postMessage({ type: 'PREVIEW_TEMPLATE_HOME_CLEARED', payload: payload() }, '*');
+            }
+            booted = true;
+        }
+        function start() {
+            tick();
+            new MutationObserver(tick).observe(document.body, { childList: true, subtree: true, characterData: true });
+        }
+        if (document.body) { start(); }
+        else { document.addEventListener('DOMContentLoaded', start, { once: true }); }
+    })();
+    </script><script>
+    (function() {
+        if (window.self === window.top) return;
+        function postUnsupported(reason) {
+            window.parent.postMessage({
+                type: 'IFRAME_FIRST_CONTENTFUL_PAINT_UNSUPPORTED',
+                payload: { reason: reason, userAgent: navigator.userAgent }
+            }, '*');
+        }
+        if (typeof PerformanceObserver === 'undefined') {
+            postUnsupported('no_performance_observer');
+            return;
+        }
+        try {
+            var obs = new PerformanceObserver(function(list) {
+                var entries = list.getEntries();
+                for (var i = 0; i < entries.length; i++) {
+                    if (entries[i].name === 'first-contentful-paint') {
+                        obs.disconnect();
+                        window.parent.postMessage({ type: 'IFRAME_FIRST_CONTENTFUL_PAINT' }, '*');
+                        return;
+                    }
+                }
+            });
+            obs.observe({ type: 'paint', buffered: true });
+        } catch (e) {
+            postUnsupported('observe_threw:' + (e && e.name ? e.name : 'Error'));
+        }
+    })();
+    </script><script>
+    (function() {
+        if (window.self === window.top) return;
+        var lastUrl = window.location.href;
+        function notify() {
+            var url = window.location.href;
+            if (url === lastUrl) return;
+            lastUrl = url;
+            window.parent.postMessage({ type: 'APP_CHANGED_URL', url: url }, '*');
+        }
+        var origPush = history.pushState.bind(history);
+        history.pushState = function() { origPush.apply(history, arguments); notify(); };
+        var origReplace = history.replaceState.bind(history);
+        history.replaceState = function() { origReplace.apply(history, arguments); notify(); };
+        window.addEventListener('popstate', notify);
+        window.parent.postMessage({ type: 'APP_CHANGED_URL', url: window.location.href }, '*');
+    })();
+    </script></head>
 <body class="intitle lobby">
 <script>
 (()=>{const d=document.createElement('div');d.id='splash';d.style.cssText='position:fixed;inset:0;z-index:99999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:background 1s,opacity .9s;font-family:"Zen Maru Gothic",system-ui,sans-serif;text-align:center;padding:20px;box-sizing:border-box';
@@ -2018,13 +2315,12 @@ const ICE=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:
  {urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'},
  {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turns:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}];
 // 2段目の「間接接続」：WebRTCがどうしても繋がらない時だけ、公開MQTTブローカー(WebSocket)を郵便受けにして入室・通信する（遅いが確実）
-const MQTT_LIBS=['https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js','https://cdn.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js','https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js'];
-const MQTT_URLS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081'];
+
 const PEER_OPTS=Object.assign({debug:1,config:{iceServers:ICE.concat(TURN_EXTRA)}},PEER_SERVER);
 const FAST_ID=17;                                           // 位置用チャンネルのID（両端で同じ番号を使う）
 const Net={s:null,gen:0};
 const RT=new Map();                                         // 相手ごとの往復時間(ms)
-Net.relayed=()=>{const s=Net.s;return!!s&&[...s.links.values()].some(l=>l.open&&l.conn&&l.conn.relay)};   // 中継経由の相手がいるか（ping表示用）
+Net.relayed=()=>false;   // 中継経由の相手がいるか（ping表示用）
 window.__NET=Net;
 
 const safe=f=>{try{f()}catch(e){try{console.error(e)}catch(_){}}};
@@ -2050,34 +2346,8 @@ const loadJs=(key,urls,ready,msg)=>{if(ready())return Promise.resolve();if(jsP[k
  return jsP[key]};
 const loadLib=()=>loadJs('peer',PEER_LIBS,PeerCls,'通信ライブラリ（PeerJS）を読み込めません\nネットワークを確認して、もう一度お試しください');
 
-// ---------- 中継バス（公開MQTTブローカー経由）：直結もTURNもだめな回線の最終手段 ----------
-// 自分のPeerIDを宛先にした「郵便受け」(トピック)を購読し、相手の郵便受けへ書き込む。ホストは部屋を作った時から待ち受け、直結できない人はここから入室する
-const busTopic=pid=>PFX+'in/'+pid;
-const busClose=(s,force)=>{s.busTok=(s.busTok|0)+1;const c=s.busCli;s.bus=null;s.busCli=null;if(c){try{c.end(!!force)}catch(e){}}};
-const busUp=s=>{if(s.bus)return s.bus;const tok=s.busTok=(s.busTok|0)+1;
- const p=(async()=>{
-  await loadJs('mqtt',MQTT_LIBS,()=>window.mqtt,'中継用ライブラリを読み込めません');
-  const me=busTopic(s.peer.id);
-  for(const url of MQTT_URLS){
-   if(s.dead||s.busTok!==tok)throw'dead';let cli;
-   try{cli=await new Promise((ok,no)=>{const c=window.mqtt.connect(url,{clientId:'bl'+Math.random().toString(36).slice(2,12),clean:true,reconnectPeriod:2000,connectTimeout:6000,keepalive:30});
-    const to=setTimeout(()=>{try{c.end(true)}catch(e){}no('timeout')},7000);c.on('error',()=>{});
-    c.on('connect',()=>{clearTimeout(to);c.subscribe(me,{qos:0},e=>e?no('sub'):ok(c))})})}catch(e){continue}      // このブローカーがだめなら次へ
-   if(s.dead||s.busTok!==tok){try{cli.end(true)}catch(e){}throw'dead'}
-   cli.on('message',(tp,m)=>busIn(s,m));s.busCli=cli;return cli}
-  throw'bus'})();
- s.bus=p;p.catch(()=>{if(s.bus===p)s.bus=null});return p};
-const busPub=(s,pid,o)=>{const c=s.busCli;if(!c||!c.connected||!s.peer)return;try{c.publish(busTopic(pid),JSON.stringify({f:s.peer.id,d:o}),{qos:0})}catch(e){}};
-// 中継の「接続」：PeerJSの接続と同じ形（on/send/close/open）にして、以降の処理（Link）をそのまま使えるようにする
-const mkRelayConn=(s,pid)=>{const h={};const c={peer:pid,open:true,relay:true,peerConnection:null,
- on(e,f){(h[e]=h[e]||[]).push(f);return c},send(o){busPub(s,pid,o)},close(){if(c.open){c.open=false;(h.close||[]).forEach(f=>f())}}};return c};
-const busIn=(s,m)=>{if(s.dead)return;let o;try{o=JSON.parse(typeof m==='string'?m:new TextDecoder().decode(m))}catch(e){return}
- if(!o||!o.f||o.d==null)return;const pid=String(o.f);let L=s.links.get(pid);
- // 直結を試した時点でこちらには「接続が来た」扱いのリンクだけが残り、ICEが通らず開かないまま居座ることがある。
- // それが残っていると中継から届いた入室要求がそこに流れて、返事(welcome)が送れず相手がずっと入れない → 開いていない直結リンクは中継リンクに置き換える
- if(L&&!L.conn.relay&&!(L.open&&L.conn.open)){if(!s.R)return;L=null}
- if(!L){if(!s.R)return;L=addLink(s,mkRelayConn(s,pid))}                  // 部屋の主だけが、見知らぬ相手(直結できなかった人)を受け入れる
- onData(s,L,o.d,false)};
+// ---------- 中継バスは廃止：WebRTCの直結（＋TURN）だけでつなぐ ----------
+const busClose=()=>{};                                     // 旧・中継の後片付け（何もしない）
 
 // ---------- Peer（待ち合わせサーバーへの登録） ----------
 const mkPeer=(s,id)=>new Promise((res,rej)=>{
@@ -2156,7 +2426,7 @@ const onData=(s,L,d,viaFast)=>{if(s.dead)return;
    if(old&&old.host!==s.R.host)safe(()=>onMsg({t:'host',id:s.R.host}));
    safe(()=>onMsg(snap(s)));return}
   case'start':if(!fromHost)return;s.R.st=1;s.R.cd=0;return safe(()=>onMsg(d));
-  case'round':case'rend':if(!fromHost)return;return safe(()=>onMsg(d));
+  case'round':case'rend':case'sync':if(!fromHost)return;return safe(()=>onMsg(d));
   case'mend':if(!fromHost)return;s.R.st=0;s.R.noauto=1;return safe(()=>onMsg(d));
   case'left':{if(!fromHost)return;const p=memb(s,d.id);s.R.pl=s.R.pl.filter(x=>x.id!==d.id);RT.delete(d.id);
    if(p){const X=s.links.get(p.pid);if(X){s.links.delete(p.pid);try{X.conn.close()}catch(e){}}}
@@ -2205,8 +2475,8 @@ const netLost=s=>{if(s.dead)return;safe(()=>onDisc());closeWs()};
 // ---------- 時計合わせ・生存確認（全員が全員へ2秒ごとにping。時計の基準はホスト） ----------
 const startLoops=s=>{clearInterval(s.pingI);
  const ping=()=>{if(s.dead)return;const c=performance.now();for(const L of s.links.values())if(L.open)sendL(L,{t:'ping',c},true)};
- for(let i=0;i<5;i++)setTimeout(ping,i*140);
- s.pingI=setInterval(()=>{ping();const t=performance.now();for(const L of[...s.links.values()])if(L.open&&t-L.rx>8000)linkGone(s,L)},2000)};   // 8秒無言＝切断
+ for(let i=0;i<3;i++)setTimeout(ping,i*160);
+ s.pingI=setInterval(()=>{ping();const t=performance.now();for(const L of[...s.links.values()])if(L.open&&t-L.rx>10000)linkGone(s,L)},4000)};   // 8秒無言＝切断
 const meshUp=s=>{const R=s.R;for(const p of R.pl){if(p.id===s.me||p.id===R.host||s.links.has(p.pid))continue;
  connectTo(s,p.pid,9000).then(c=>{if(s.dead){try{c.close()}catch(e){}return}const L=addLink(s,c,p.id);sendL(L,{t:'hi',id:s.me})}).catch(()=>{})}};   // 失敗してもホスト経由で続行できる
 
@@ -2217,14 +2487,12 @@ const hostAt=async(s,pid,o)=>{                                  // true=成功 /
  if(s.dead){try{p.destroy()}catch(e){}return false}
  attach(s,p);s.me=1;ON.id=1;ON.off=0;ON.sm=[];
  s.R={code:o.code,n:o.n,pub:!!o.pub,host:1,cd:0,st:0,nid:2,noauto:0,pl:[{id:1,name:nm(pname()),team:0,ci:cur,pid:p.id}]};
- startLoops(s);pushRoom(s);busUp(s).catch(()=>{});return true};     // 中継の待ち受けも裏で準備（直結できない人用）
+ startLoops(s);pushRoom(s);return true};
 const tryJoin=async(s,pid)=>{                                    // 'ok' | 'absent'(そのIDの部屋は無い) | 'full' | 'fail'
  let c,wait=7000;
- const pre=setTimeout(()=>{if(!s.dead&&s.peer)busUp(s).catch(()=>{})},1500);   // 直結に1.5秒以上かかっているなら、中継の準備も裏で始めておく（だめでも待たされない）
- try{c=await connectTo(s,pid,7000);clearTimeout(pre)}catch(e){clearTimeout(pre);
+ try{c=await connectTo(s,pid,7000)}catch(e){
   if(e==='absent')return'absent';
-  try{stat('直結できないため、中継経由で接続しています…');await Promise.race([busUp(s),new Promise((_,no)=>setTimeout(()=>no('timeout'),15000))])}catch(_){return'fail'}      // 直結できない回線：中継バスで入る（15秒でだめなら諦めてエラー表示）
-  if(s.dead)return'dead';c=mkRelayConn(s,pid);wait=8000}
+  return'fail'}
  if(s.dead){try{c.close()}catch(e){}return'dead'}
  const L=addLink(s,c);
  const r=await new Promise(res=>{const to=setTimeout(()=>{s.joinW=null;res({t:'err',c:'timeout'})},wait);
@@ -2293,6 +2561,7 @@ const onMsg=m=>{switch(m.t){
  case'room':return onRoom(m);
  case'start':return onStart(m);
  case'round':return onRound(m);
+ case'sync':return onSync(m);
  case'rend':return onRend(m);
  case'mend':return onMend(m);
  case'bt':return onBt(m);
@@ -2325,7 +2594,7 @@ $('#on-join').onclick=()=>{const c=$('#on-code').value.trim().toUpperCase();if(c
 document.querySelectorAll('#onr [data-tm]').forEach(b=>b.onclick=()=>{sfx('tap');send({t:'team',team:+b.dataset.tm})});
 document.querySelectorAll('#or-maps div').forEach(b=>b.onclick=()=>{sfx('tap');ON.mapSel=b.dataset.m;document.querySelectorAll('#or-maps div').forEach(x=>x.classList.toggle('on',x===b))});
 $('#or-start').onclick=()=>{if(amHost()){sfx('ok');send({t:'start',map:ON.mapSel})}};
-$('#or-copy').onclick=async()=>{if(!ON.room)return;const u=location.origin+location.pathname+'?room='+ON.room.code;
+$('#or-copy').onclick=async()=>{if(!ON.room)return;const u=location.origin+'/?room='+ON.room.code;
  try{await navigator.clipboard.writeText(u);$('#or-note').textContent='招待リンクをコピーしました'}catch(e){$('#or-note').textContent='コード「'+ON.room.code+'」を友だちに伝えてね'}sfx('ok')};
 
 // ---------- 試合のはじまり ----------
@@ -2351,7 +2620,7 @@ const onStart=m=>{
  window.__vm=ON.map.id;window.__sp=ON.map;
  home.style.display='none';applyMap('S');if(!st.on)summon();$('#sb').style.display='block';$('#nping').style.display='block';
  setTimeout(()=>{if(ON.active)onRound(m)},100)};
-const onRound=m=>{if(m.n===MT.round&&(MT.state==='count'||MT.state==='play'))return;clearTimeout(ON.nxT);MT.round=m.n;MT.state='count';MT.goAt=m.go;MT.cn=0;ON.sentNext=false;
+const onRound=m=>{if(m.n===MT.round&&(MT.state==='count'||MT.state==='play'))return;clearTimeout(ON.nxT);MT.round=m.n;MT.state='count';MT.goAt=m.go;MT.cn=0;ON.sentNext=false;ON.endT=0;ON.bT=0;ON.syncT=0;ON.rend=null;
  const my=slotOf(ON.myTeam,ON.id);
  st.pos.set(my.x,0,my.z);st.face=my.face;st.cy=ON.myTeam===0?0:Math.PI;st.vy=0;st.slide=0;revive();st.lock=true;invT=1;curT.set(st.pos.x,1.2,st.pos.z);FX.position.set(st.pos.x,0,st.pos.z);
  for(const[id,u]of ON.units){const t=ON.pl.find(p=>p.id===id);resetUnit(u);if(t){const s=slotOf(t.team,id);u.x=s.x;u.z=s.z;u.face=s.face}}
@@ -2378,10 +2647,10 @@ const onLeft=m=>{if(!ON.active)return;const p=ON.pl.find(x=>x.id===m.id),u=ON.un
  if(p)setMsg(p.name+'が退出しました');checkTeams()};
 
 // ---------- 位置の送受信（60Hz。画面更新が60fps未満の端末ではその回数まで） ----------
-const netSend=dt=>{ON.sendT-=dt;if(ON.sendT>0)return;ON.sendT=Math.max(ON.sendT+1/30,-.05);
+const netSend=dt=>{ON.sendT-=dt;if(ON.sendT>0)return;ON.sendT=Math.max(ON.sendT+1/20,-.05);
  if(MT.state==='setup'||ON.lost)return;
  const a=[r2(st.pos.x),r2(st.pos.y),r2(st.pos.z),r2(st.face),HP.cur|0,window.heldW||'',st.dead?1:0,MT.round],L=ON.last,t=performance.now();
- if(L&&t-ON.hb<250&&a.every((v,i)=>v===L[i]))return;       // 止まっている間は4Hzの生存通知だけ（動いている間は毎回送る）
+ if(L&&t-ON.hb<400&&a.every((v,i)=>v===L[i]))return;       // 止まっている間は4Hzの生存通知だけ（動いている間は毎回送る）
  ON.last=a;ON.hb=t;send({t:'s',c:r1(t),p:a})};
 const onBt=m=>{if(!ON.active)return;const sn=sNow(),pn=performance.now();
  for(const e of m.s){const[id,T,x,y,z,f,hp,wp,fl,r]=e;if(id===ON.id)continue;const u=ON.units.get(id);if(!u)continue;
@@ -2434,15 +2703,30 @@ const onlineTick=dt=>{netSend(dt);tickGP(dt);
  if(MT.state==='count'){const left=(MT.goAt-sNow())/1000,n=Math.ceil(left);
   if(n!==MT.cn&&n>=1&&n<=3){MT.cn=n;banner(String(n),'#ffd34d',900);sfx('tap')}
   if(left<=0){MT.state='play';if(!st.dead)st.lock=false;banner('FIGHT!','#ff5a4a',1100);sfx('f1');shake(.05)}}
- else if(MT.state==='play'){if((ON.sbT=(ON.sbT||0)-dt)<=0){ON.sbT=.25;updSB()}
-  if(amHost()){const aA=aliveCt('A'),aB=aliveCt('B');
-   if(!aA||!aB){MT.state='ending';const w=aA?ON.myTeam:aB?1-ON.myTeam:-1,sc=ON.score.slice();if(w>=0)sc[w]++;send({t:'rend',w,sc})}}}
- else if(MT.state==='between'){MT.t-=dt;
-  if(MT.t<=0&&amHost()){if(!ON.sentNext)advanceRound();else if(performance.now()-(ON.sentAt||0)>2500)ON.sentNext=false}}};   // 送ったのに2.5秒たっても進まなければ再送
-const advanceRound=go=>{if(!ON.active||!amHost()||MT.state!=='between'||ON.sentNext)return;ON.sentNext=true;ON.sentAt=performance.now();
- if(Math.max(ON.score[0],ON.score[1])>=5)send({t:'mend',w:ON.score[0]>=5?0:1,sc:ON.score});else send({t:'round',n:MT.round+1,go:go})};
+  else if(MT.state==='play'){if((ON.sbT=(ON.sbT||0)-dt)<=0){ON.sbT=.25;updSB()}
+   if(amHost()){const aA=aliveCt('A'),aB=aliveCt('B');
+    if(!aA||!aB){MT.state='ending';ON.endT=0;const w=aA?ON.myTeam:aB?1-ON.myTeam:-1,sc=ON.score.slice();if(w>=0)sc[w]++;ON.rend={w:w,sc:sc,nx:sNow()+3400};send({t:'rend',w:w,sc:sc})}}}
+ else if(MT.state==='ending'){ON.endT=(ON.endT||0)+dt;
+   if(amHost()&&ON.endT>1.5&&ON.rend){ON.endT=0;safe(()=>onRend(ON.rend))}}          // ラウンド終了の合図が自分に返ってこなかった時の保険
+ else if(MT.state==='between'){MT.t-=dt;ON.bT=(ON.bT||0)+dt;
+   if(amHost()){if(MT.t<=0&&!ON.sentNext)advanceRound();else if(ON.sentNext&&performance.now()-(ON.sentAt||0)>2500)ON.sentNext=false;
+    if(ON.bT>6){ON.bT=0;ON.sentNext=false;advanceRound()}}}                          // 6秒たっても次に進まなければ強制的に進める
+ hostSync(dt)};
+const advanceRound=go=>{if(!ON.active||!amHost()||MT.state!=='between'||ON.sentNext)return;
+ const sc=ON.score,n=MT.round+1;ON.sentNext=true;ON.sentAt=performance.now();ON.bT=0;
+ if(Math.max(sc[0],sc[1])>=5){send({t:'mend',w:sc[0]>=5?0:1,sc:sc});return}
+ const g=go||(sNow()+3500);
+ send({t:'round',n:n,go:g});                                                          // ほかの全員へ
+ safe(()=>onRound({n:n,go:g}))};                                                      // ホスト自身はその場で次ラウンドへ（自分のメッセージの折り返しを待たない）
 // 各端末が自分のタイマーで同じ時刻に次ラウンドへ入る（ホストからの通知待ち・描画の遅さに左右されない）
 const startNext=go=>{if(!ON.active||ON.lost||MT.state!=='between'||Math.max(ON.score[0],ON.score[1])>=5)return;onRound({n:MT.round+1,go:go})};
+// ホストが2秒ごとに進行状況を配る。取りこぼした人・遅れた人はこれで自動的に追いつく
+const hostSync=dt=>{if(!ON.active||!amHost())return;ON.syncT=(ON.syncT||0)+dt;if(ON.syncT<2)return;ON.syncT=0;
+ const s=Net.s;if(!s||!s.R||s.R.pl.length<2)return;bcast(s,{t:'sync',st:MT.state,n:MT.round,go:Math.round(MT.goAt||0)})};
+const onSync=m=>{if(!ON.active||amHost())return;
+ if(m.n>MT.round){onRound({n:m.n,go:m.go});return}                                   // 次のラウンドに取り残されていた
+ if(m.n===MT.round&&m.st==='count'&&MT.state!=='count'){onRound({n:m.n,go:m.go});return}
+ if(m.n===MT.round&&m.st==='play'&&(MT.state==='between'||MT.state==='ending')){clearTimeout(ON.nxT);MT.t=0;MT.state='play';MT.goAt=m.go;st.lock=!st.dead}};
 
 // ---------- 既存の処理へのフック（CPU対戦のコードは触らず、オンライン時だけ分岐） ----------
 const _sh=showHome;showHome=function(){if(ON.active)return;_sh()};window.showHome=showHome;   // 試合中は、遅れて来たホーム表示を無視（onHome→leaveMatch→切断 の連鎖を防ぐ）
