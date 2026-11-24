@@ -321,6 +321,23 @@ linear-gradient(var(--c,#7fd4ff),var(--c,#7fd4ff)) 100% 100%/11px 2px no-repeat,
 #ammo.low b{color:#ff6a6a;text-shadow:0 0 12px rgba(255,60,60,.8),0 2px 0 #000;animation:ammolow .5s infinite alternate}@keyframes ammolow{to{opacity:.55}}
 
 </style>
+<style>html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}</style>
+<script>
+/* ダブルタップ／ピンチによるズームを無効化（iOS Safariはviewportの指定を無視するため、JSでも防止） */
+(function(){
+  var opt={passive:false},last=0,lx=0,ly=0;
+  function field(t){return t&&t.closest&&t.closest('input,textarea,select,[contenteditable="true"]')}
+  document.addEventListener('touchend',function(e){
+    if(e.touches.length||e.changedTouches.length!==1)return;
+    var t=e.changedTouches[0],n=Date.now();
+    if(n-last<350&&Math.abs(t.clientX-lx)<40&&Math.abs(t.clientY-ly)<40&&!field(e.target)&&e.cancelable)e.preventDefault();
+    last=n;lx=t.clientX;ly=t.clientY;
+  },opt);
+  document.addEventListener('dblclick',function(e){if(!field(e.target))e.preventDefault()},opt);
+  ['gesturestart','gesturechange','gestureend'].forEach(function(k){document.addEventListener(k,function(e){e.preventDefault()},opt)});
+  document.addEventListener('touchmove',function(e){if(e.touches.length>1&&e.cancelable)e.preventDefault()},opt);
+})();
+</script>
 </head>
 <body class="intitle lobby">
 <script>
@@ -1490,7 +1507,7 @@ function bgmTick(){const m=MU[bgmMode],step=60/m.bpm/4;if(AC&&S.bv>0){const t=AC
 addEventListener('pointerdown',()=>{if(bgmOn)return;bgmOn=true;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();AC.resume()}catch(e){}bgmTick()},{once:true});
 // ===================== メインループ =====================
 let last=performance.now(),qT=0;
-function tick(now){requestAnimationFrame(tick);const dt=Math.min(.05,(now-last)/1000);last=now;T2+=dt;
+function tick(now){requestAnimationFrame(tick);if(window.__capFps&&now-last<window.__capFps)return;const dt=Math.min(.05,(now-last)/1000);last=now;T2+=dt;
  const gunHeld=!!WS[window.heldW]&&!(window.heldW==='gb'&&AK.mag<=0);
  xhEl.style.display=(st.on&&!st.dead&&(gunHeld||window.heldW==='bw')&&!window.SCOPED)?'block':'none';
  invT=Math.max(0,invT-dt);buffT=Math.max(0,buffT-dt);fluteCd=Math.max(0,fluteCd-dt);eqT=Math.max(0,eqT-dt);
@@ -2319,7 +2336,7 @@ const onStart=m=>{
  closeAll();sfx('ok');
  const mine=m.pl.filter(p=>p.team===me.team).length;
  MT.on=true;MT.a=mine;MT.b=m.pl.length-mine;MT.sc=[0,0];MT.round=m.n;MT.state='setup';MY.team='A';kills=0;ON.active=true;
- try{if(ON.pr==null)ON.pr=R.getPixelRatio();R.setPixelRatio(Math.min(ON.pr,1.25));R.setSize(innerWidth,innerHeight)}catch(e){}
+ try{if(ON.pr==null)ON.pr=R.getPixelRatio();R.setPixelRatio(Math.min(ON.pr,1));R.setSize(innerWidth,innerHeight);window.__capFps=15;ON.ft=performance.now();ON.fn=0}catch(e){}
  freeUnits();
  for(const p of m.pl){if(p.id===ON.id)continue;const u=takeUnit();resetUnit(u);u.net=true;u.pid=p.id;u.absTeam=p.team;u.team=p.team===me.team?'A':'B';u.name=p.name;
   setUnitChar(u,(p.ci|0)%CHARS.length);u.tag.material.map=tagTex(p.name,u.team==='A'?'#6fc2ff':'#ff7a7a');u.tag.material.needsUpdate=true;u.active=true;ON.units.set(p.id,u)}
@@ -2344,7 +2361,7 @@ const onMend=m=>{if(!ON.active)return;MT.state='over';st.lock=true;const win=m.w
  sfx(win?'f3':'die');showRes(win?'勝利！':'敗北…',win?'#ffd34d':'#ff7a7a',m.ab?'相手が退出したため終了':a+' － '+b,!!ON.ws)};
 const onDisc=()=>{if(ON.active){if(ON.lost)return;ON.lost=true;MT.state='over';st.lock=true;banner('接続が切れました','#ff6a6a',1800);showRes('切断','#ff9a6a','通信が切れました',false)}
  else{ON.room=null;if($('#onr').style.display==='block'){closeAll();$('#onp').style.display='block'}err('通信が切れました');stat('')}};
-const endOnline=()=>{try{if(ON.pr!=null){R.setPixelRatio(ON.pr);R.setSize(innerWidth,innerHeight);ON.pr=null}}catch(e){}ON.active=false;ON.lost=false;freeUnits();$('#nping').style.display='none';for(const q of ON.gp)SCN.remove(q.m);ON.gp.length=0;if(!ON.keepRoom)leaveRoom()};
+const endOnline=()=>{window.__capFps=0;try{if(ON.pr!=null){R.setPixelRatio(ON.pr);R.setSize(innerWidth,innerHeight);ON.pr=null}}catch(e){}ON.active=false;ON.lost=false;freeUnits();$('#nping').style.display='none';for(const q of ON.gp)SCN.remove(q.m);ON.gp.length=0;if(!ON.keepRoom)leaveRoom()};
 const checkTeams=()=>{if(!ON.active||!amHost()||MT.state==='over')return;const c=[0,0];ON.pl.forEach(p=>c[p.team]++);
  if(!c[0]||!c[1])send({t:'mend',w:c[0]?0:1,sc:ON.score,ab:1})};
 const onLeft=m=>{if(!ON.active)return;const p=ON.pl.find(x=>x.id===m.id),u=ON.units.get(m.id);
@@ -2402,6 +2419,8 @@ const tickGP=dt=>{for(let i=ON.gp.length-1;i>=0;i--){const q=ON.gp[i];q.t+=dt;
 
 // ---------- ラウンド進行 ----------
 const onlineTick=dt=>{netSend(dt);tickGP(dt);
+ ON.fn=(ON.fn||0)+1;{const nw=performance.now();if(!ON.ft)ON.ft=nw;if(nw-ON.ft>=2000){const f=ON.fn*1000/(nw-ON.ft);ON.ft=nw;ON.fn=0;try{const c=R.getPixelRatio();if(f<42&&c>.7){R.setPixelRatio(Math.max(.7,c-.15));R.setSize(innerWidth,innerHeight)}}catch(e){}}}
+
  ON.delay+=(Math.min(.3,Math.max(.1,ON.lag+ON.dev*2.5+.025))-ON.delay)*Math.min(1,dt*.8);   // 回線に合わせて表示遅延をゆっくり調整
  if(ON.lost)return;
  if(MT.state==='count'){const left=(MT.goAt-sNow())/1000,n=Math.ceil(left);
@@ -2434,6 +2453,7 @@ rayBots=function(o,d,maxT){let best=null;const S4=[[1.58,.28],[1.3,.38],[.9,.4],
   for(let k=0;k<4;k++){const y=S4[k][0]+by,r=S4[k][1],cx=b.x-o.x,cy=y-o.y,cz=b.z-o.z,t=cx*d.x+cy*d.y+cz*d.z;if(t<0||t>maxT)continue;
    const px=cx-d.x*t,py=cy-d.y*t,pz=cz-d.z*t;if(px*px+py*py+pz*pz<r*r){if(!best||t<best.t)best={b,t,head:k===0};break}}}
  return best};
+const _pf=puff;puff=function(p,col,n){if(ON.active){if(PS.length>110)return;arguments[2]=Math.max(1,Math.ceil(n*.5))}return _pf.apply(null,arguments)};
 const _tr=tracer;tracer=function(end,sx,sy,sz,col){_tr.apply(null,arguments);
  if(ON.active&&sx===undefined){const t=performance.now();if(t-ON.shotT<25)return;ON.shotT=t;send({t:'ev',k:'sh',w:window.heldW||'',e:[r1(end.x),r1(end.y),r1(end.z)]})}};
 const _ml=melee;melee=function(id){_ml(id);if(ON.active)send({t:'ev',k:'sw',w:id,p:[r1(st.pos.x),r1(st.pos.y),r1(st.pos.z)]})};
