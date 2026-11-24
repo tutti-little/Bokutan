@@ -321,21 +321,29 @@ linear-gradient(var(--c,#7fd4ff),var(--c,#7fd4ff)) 100% 100%/11px 2px no-repeat,
 #ammo.low b{color:#ff6a6a;text-shadow:0 0 12px rgba(255,60,60,.8),0 2px 0 #000;animation:ammolow .5s infinite alternate}@keyframes ammolow{to{opacity:.55}}
 
 </style>
-<style>html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}</style>
+<style>*{touch-action:manipulation}html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}</style>
 <script>
-/* ダブルタップ／ピンチによるズームを無効化（iOS Safariはviewportの指定を無視するため、JSでも防止） */
+/* ダブルタップ／ピンチによるズームを無効化（iOS等はviewport指定を無視するため、JSでも防止。他の処理に邪魔されないようwindowのキャプチャ段階で処理） */
 (function(){
-  var opt={passive:false},last=0,lx=0,ly=0;
+  var opt={passive:false,capture:true},last=0,lx=0,ly=0;
   function field(t){return t&&t.closest&&t.closest('input,textarea,select,[contenteditable="true"]')}
-  document.addEventListener('touchend',function(e){
-    if(e.touches.length||e.changedTouches.length!==1)return;
-    var t=e.changedTouches[0],n=Date.now();
-    if(n-last<350&&Math.abs(t.clientX-lx)<40&&Math.abs(t.clientY-ly)<40&&!field(e.target)&&e.cancelable)e.preventDefault();
-    last=n;lx=t.clientX;ly=t.clientY;
+  function dbl(e,t){var n=Date.now();
+    var hit=n-last<400&&Math.abs(t.clientX-lx)<60&&Math.abs(t.clientY-ly)<60;
+    last=n;lx=t.clientX;ly=t.clientY;window.__dtHit=hit;
+    if(hit&&!field(e.target)&&e.cancelable)e.preventDefault();
+  }
+  window.addEventListener('touchstart',function(e){
+    if(e.touches.length>1){if(e.cancelable)e.preventDefault();return}
+    dbl(e,e.touches[0]);
   },opt);
-  document.addEventListener('dblclick',function(e){if(!field(e.target))e.preventDefault()},opt);
-  ['gesturestart','gesturechange','gestureend'].forEach(function(k){document.addEventListener(k,function(e){e.preventDefault()},opt)});
-  document.addEventListener('touchmove',function(e){if(e.touches.length>1&&e.cancelable)e.preventDefault()},opt);
+  window.addEventListener('touchend',function(e){
+    if(window.__dtHit&&!field(e.target)&&e.cancelable)e.preventDefault();
+    if(!e.touches.length)window.__dtHit=false;
+  },opt);
+  window.addEventListener('dblclick',function(e){if(!field(e.target))e.preventDefault()},opt);
+  ['gesturestart','gesturechange','gestureend'].forEach(function(k){window.addEventListener(k,function(e){e.preventDefault()},opt)});
+  window.addEventListener('touchmove',function(e){if(e.touches.length>1&&e.cancelable)e.preventDefault()},opt);
+  try{var m=document.querySelector('meta[name=viewport]');if(m)m.setAttribute('content','width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover')}catch(_){}
 })();
 </script>
 </head>
@@ -2253,8 +2261,8 @@ const send=o=>{const s=Net.s;if(!s||s.dead)return;
   case'leave':closeWs();return;
   case'team':{if(!s.R)return;if(isHost(s))setTeam(s,s.me,o.team);else{const H=s.links.get(pidOf(s,s.R.host));if(H)sendL(H,{t:'team',team:o.team})}return}
   case'start':{const R=s.R;if(!R||!isHost(s)||R.st||!R.pl.some(p=>p.team===0)||!R.pl.some(p=>p.team===1))return;doStart(s,o.map);return}
-  case'round':if(s.R&&isHost(s))ctl(s,{t:'round',n:o.n,go:sNow()+3500});return;
-  case'rend':if(s.R&&isHost(s))ctl(s,{t:'rend',w:o.w,sc:o.sc});return;
+  case'round':if(s.R&&isHost(s))ctl(s,{t:'round',n:o.n,go:o.go||sNow()+3500});return;
+  case'rend':if(s.R&&isHost(s))ctl(s,{t:'rend',w:o.w,sc:o.sc,nx:sNow()+3400});return;
   case'mend':if(s.R&&isHost(s)){s.R.st=0;s.R.noauto=1;ctl(s,{t:'mend',w:o.w,sc:o.sc,ab:o.ab});pushRoom(s)}return;
   case's':{if(!s.R||s.R.pl.length<2)return;bcast(s,{t:'bt',s:[[s.me,r1(sNow()),...o.p]]},true);return}      // 位置：高速チャンネル
   case'hit':sendTo(s,o.to,{t:'hit',f:s.me,dm:o.dm,hd:o.hd});return;                                          // ダメージ：確実に届く方
@@ -2349,7 +2357,7 @@ const onRound=m=>{if(m.n===MT.round&&(MT.state==='count'||MT.state==='play'))ret
  for(const[id,u]of ON.units){const t=ON.pl.find(p=>p.id===id);resetUnit(u);if(t){const s=slotOf(t.team,id);u.x=s.x;u.z=s.z;u.face=s.face}}
  for(const k in WS){AMMO[k].mag=WS[k].max;AMMO[k].res=WS[k].res}fireT=0;rl=0;window.GRN=3;if(window.heldW&&WS[window.heldW]){AK.mag=AK.max;AK.res=WS[window.heldW].res}ammoUI();
  updSB();setMsg('ラウンド '+MT.round+'　5点先取')};
-const onRend=m=>{if(!ON.active)return;MT.state='between';MT.t=3.4;ON.score=m.sc.slice();MT.sc=[ON.score[ON.myTeam],ON.score[1-ON.myTeam]];updSB();st.lock=true;ON.sentNext=false;clearTimeout(ON.nxT);ON.nxT=setTimeout(()=>{try{advanceRound()}catch(e){}},3600);
+const onRend=m=>{if(!ON.active)return;MT.state='between';MT.t=3.4;ON.score=m.sc.slice();MT.sc=[ON.score[ON.myTeam],ON.score[1-ON.myTeam]];updSB();st.lock=true;ON.sentNext=false;clearTimeout(ON.nxT);{const nx=m.nx||(sNow()+3400),dl=Math.min(6000,Math.max(0,nx-sNow()));ON.nxT=setTimeout(()=>{try{if(amHost())advanceRound(nx+3500);else startNext(nx+3500)}catch(e){}},dl)}
  const win=m.w===ON.myTeam,draw=m.w<0;banner(draw?'DRAW':win?'ROUND WIN!':'ROUND LOSE',draw?'#ffd34d':win?'#7fffb0':'#ff6a6a',2000);sfx(win?'f2':'die');
  if(win)puff(new THREE.Vector3(st.pos.x,1.5,st.pos.z),0xffe070,40,7,1.1,.35,2,.6)};
 const showRes=(title,col,sub,rematch)=>{const o=$('#mres');o.style.display='block';
@@ -2431,8 +2439,10 @@ const onlineTick=dt=>{netSend(dt);tickGP(dt);
    if(!aA||!aB){MT.state='ending';const w=aA?ON.myTeam:aB?1-ON.myTeam:-1,sc=ON.score.slice();if(w>=0)sc[w]++;send({t:'rend',w,sc})}}}
  else if(MT.state==='between'){MT.t-=dt;
   if(MT.t<=0&&amHost()){if(!ON.sentNext)advanceRound();else if(performance.now()-(ON.sentAt||0)>2500)ON.sentNext=false}}};   // 送ったのに2.5秒たっても進まなければ再送
-const advanceRound=()=>{if(!ON.active||!amHost()||MT.state!=='between'||ON.sentNext)return;ON.sentNext=true;ON.sentAt=performance.now();
- if(Math.max(ON.score[0],ON.score[1])>=5)send({t:'mend',w:ON.score[0]>=5?0:1,sc:ON.score});else send({t:'round',n:MT.round+1})};
+const advanceRound=go=>{if(!ON.active||!amHost()||MT.state!=='between'||ON.sentNext)return;ON.sentNext=true;ON.sentAt=performance.now();
+ if(Math.max(ON.score[0],ON.score[1])>=5)send({t:'mend',w:ON.score[0]>=5?0:1,sc:ON.score});else send({t:'round',n:MT.round+1,go:go})};
+// 各端末が自分のタイマーで同じ時刻に次ラウンドへ入る（ホストからの通知待ち・描画の遅さに左右されない）
+const startNext=go=>{if(!ON.active||ON.lost||MT.state!=='between'||Math.max(ON.score[0],ON.score[1])>=5)return;onRound({n:MT.round+1,go:go})};
 
 // ---------- 既存の処理へのフック（CPU対戦のコードは触らず、オンライン時だけ分岐） ----------
 const _sh=showHome;showHome=function(){if(ON.active)return;_sh()};window.showHome=showHome;   // 試合中は、遅れて来たホーム表示を無視（onHome→leaveMatch→切断 の連鎖を防ぐ）
@@ -2453,8 +2463,8 @@ rayBots=function(o,d,maxT){let best=null;const S4=[[1.58,.28],[1.3,.38],[.9,.4],
   for(let k=0;k<4;k++){const y=S4[k][0]+by,r=S4[k][1],cx=b.x-o.x,cy=y-o.y,cz=b.z-o.z,t=cx*d.x+cy*d.y+cz*d.z;if(t<0||t>maxT)continue;
    const px=cx-d.x*t,py=cy-d.y*t,pz=cz-d.z*t;if(px*px+py*py+pz*pz<r*r){if(!best||t<best.t)best={b,t,head:k===0};break}}}
  return best};
-const _pf=puff;puff=function(p,col,n){if(ON.active){if(PS.length>110)return;arguments[2]=Math.max(1,Math.ceil(n*.5))}return _pf.apply(null,arguments)};
-const _tr=tracer;tracer=function(end,sx,sy,sz,col){_tr.apply(null,arguments);
+const _pf=puff;puff=function(p,col,n){if(ON.active){if(PS.length>60)return;arguments[2]=Math.max(1,Math.ceil(n*.5))}return _pf.apply(null,arguments)};
+const _tr=tracer;tracer=function(end,sx,sy,sz,col){{const tn=performance.now();if(sx!==undefined&&tn-(ON.trT||0)<50)return;if(sx!==undefined)ON.trT=tn}_tr.apply(null,arguments);
  if(ON.active&&sx===undefined){const t=performance.now();if(t-ON.shotT<25)return;ON.shotT=t;send({t:'ev',k:'sh',w:window.heldW||'',e:[r1(end.x),r1(end.y),r1(end.z)]})}};
 const _ml=melee;melee=function(id){_ml(id);if(ON.active)send({t:'ev',k:'sw',w:id,p:[r1(st.pos.x),r1(st.pos.y),r1(st.pos.z)]})};
 const _la=launch;launch=function(k,geo,col,sp,up){_la(k,geo,col,sp,up);if(ON.active){const q=PJ[PJ.length-1];if(q)send({t:'ev',k:'pj',pk:k,p:[r1(q.m.position.x),r1(q.m.position.y),r1(q.m.position.z)],v:[r1(q.v.x),r1(q.v.y),r1(q.v.z)]})}};
