@@ -2351,7 +2351,7 @@ const onStart=m=>{
  window.__vm=ON.map.id;window.__sp=ON.map;
  home.style.display='none';applyMap('S');if(!st.on)summon();$('#sb').style.display='block';$('#nping').style.display='block';
  setTimeout(()=>{if(ON.active)onRound(m)},100)};
-const onRound=m=>{if(m.n===MT.round&&(MT.state==='count'||MT.state==='play'))return;clearTimeout(ON.nxT);MT.round=m.n;MT.state='count';MT.goAt=m.go;MT.cn=0;ON.sentNext=false;
+const onRound=m=>{if(m.n===MT.round&&(MT.state==='count'||MT.state==='play'))return;clearTimeout(ON.nxT);MT.round=m.n;MT.state='count';MT.goAt=(isFinite(m.go)&&m.go>0)?m.go:sNow()+3500;MT.cn=0;ON.sentNext=false;
  const my=slotOf(ON.myTeam,ON.id);
  st.pos.set(my.x,0,my.z);st.face=my.face;st.cy=ON.myTeam===0?0:Math.PI;st.vy=0;st.slide=0;revive();st.lock=true;invT=1;curT.set(st.pos.x,1.2,st.pos.z);FX.position.set(st.pos.x,0,st.pos.z);
  for(const[id,u]of ON.units){const t=ON.pl.find(p=>p.id===id);resetUnit(u);if(t){const s=slotOf(t.team,id);u.x=s.x;u.z=s.z;u.face=s.face}}
@@ -2463,8 +2463,13 @@ setInterval(()=>{try{let e=document.getElementById('ndbg');
   if(!ON.active||ON.lost)return;
   const k=MT.state+'|'+MT.round,now=performance.now();
   if(k!==key){key=k;t0=now;return}
-  if(!amHost())return;
   const el=now-t0;
+  if(!amHost()){
+   if(MT.state==='between'&&el>5500){t0=now;
+    if(Math.max(ON.score[0],ON.score[1])<5)onRound({n:MT.round+1,go:sNow()+3500});
+    else if(el>9000&&MT.state!=='over')onMsg({t:'mend',w:ON.score[0]>=5?0:1,sc:ON.score})}
+   else if(MT.state==='count'&&el>7000){t0=now;MT.state='play';if(!st.dead)st.lock=false}
+   return}
   if(MT.state==='ending'&&el>1500){            // ラウンド終了を送れていなかった
    const aA=aliveCt('A'),aB=aliveCt('B'),w=aA?ON.myTeam:aB?1-ON.myTeam:-1,sc=ON.score.slice();if(w>=0)sc[w]++;
    t0=now;send({t:'rend',w,sc})}
