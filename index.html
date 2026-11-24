@@ -1969,7 +1969,7 @@ const ON={ws:null,id:0,room:null,active:false,lost:false,pl:[],units:new Map(),m
 window.__ON=ON;
 const sNow=()=>performance.now()+ON.off;            // サーバー時刻(ms)の推定
 const r1=v=>Math.round(v*10)/10,r2=v=>Math.round(v*100)/100;
-const amHost=()=>!!ON.room&&ON.room.host===ON.id;
+const amHost=()=>{const s=window.__NET&&window.__NET.s;if(s&&s.R&&s.me)return s.R.host===s.me;return !!ON.room&&ON.room.host===ON.id};
 
 // ---------- UI ----------
 const css=document.createElement('style');css.textContent=`
@@ -2443,6 +2443,23 @@ const advanceRound=go=>{if(!ON.active||!amHost()||MT.state!=='between'||ON.sentN
  if(Math.max(ON.score[0],ON.score[1])>=5)send({t:'mend',w:ON.score[0]>=5?0:1,sc:ON.score});else send({t:'round',n:MT.round+1,go:go})};
 // 各端末が自分のタイマーで同じ時刻に次ラウンドへ入る（ホストからの通知待ち・描画の遅さに左右されない）
 const startNext=go=>{if(!ON.active||ON.lost||MT.state!=='between'||Math.max(ON.score[0],ON.score[1])>=5)return;onRound({n:MT.round+1,go:go})};
+
+// ---------- ホストの自動復帰（止まったら自力で進める。描画ループとは別のタイマー） ----------
+(()=>{let key='',t0=performance.now();
+ setInterval(()=>{try{
+  if(!ON.active||ON.lost)return;
+  const k=MT.state+'|'+MT.round,now=performance.now();
+  if(k!==key){key=k;t0=now;return}
+  if(!amHost())return;
+  const el=now-t0;
+  if(MT.state==='ending'&&el>1500){            // ラウンド終了を送れていなかった
+   const aA=aliveCt('A'),aB=aliveCt('B'),w=aA?ON.myTeam:aB?1-ON.myTeam:-1,sc=ON.score.slice();if(w>=0)sc[w]++;
+   t0=now;send({t:'rend',w,sc})}
+  else if(MT.state==='between'&&el>4500){       // 次ラウンドへ進めていなかった
+   t0=now;ON.sentNext=false;advanceRound(sNow()+3500)}
+  else if(MT.state==='count'&&el>7000){          // カウントダウンが終わらなかった
+   t0=now;MT.state='play';if(!st.dead)st.lock=false}
+ }catch(e){try{console.error(e)}catch(_){}}},1000)})();
 
 // ---------- 既存の処理へのフック（CPU対戦のコードは触らず、オンライン時だけ分岐） ----------
 const _sh=showHome;showHome=function(){if(ON.active)return;_sh()};window.showHome=showHome;   // 試合中は、遅れて来たホーム表示を無視（onHome→leaveMatch→切断 の連鎖を防ぐ）
